@@ -1,0 +1,171 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:17
+    container_name: ${ENV:-dev}-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-lakehouse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-lakehouse}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ../../config/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - lakehouse
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lakehouse}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: ${ENV:-dev}-minio
+    ports:
+      - "${MINIO_API_PORT:-19000}:9000"
+      - "${MINIO_CONSOLE_PORT:-19001}:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - lakehouse
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: ${ENV:-dev}-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      echo 'Waiting for MinIO to be ready...';
+      sleep 10;
+      mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER:-admin} ${MINIO_ROOT_PASSWORD};
+      mc mb myminio/${LAKEHOUSE_BUCKET:-lakehouse-dev} --ignore-existing;
+      mc mb myminio/${WAREHOUSE_BUCKET:-warehouse-dev} --ignore-existing;
+      echo 'Buckets created successfully!';
+      exit 0;
+      "
+    networks:
+      - lakehouse
+
+  nessie:
+    image: ghcr.io/projectnessie/nessie:latest
+    container_name: ${ENV:-dev}-nessie
+    ports:
+      - "${NESSIE_PORT:-19120}:19120"
+    environment:
+      nessie.version.store.type: JDBC
+      quarkus.datasource.jdbc.url: jdbc:postgresql://postgres:5432/nessie
+      quarkus.datasource.username: ${POSTGRES_USER:-lakehouse}
+      quarkus.datasource.password: ${POSTGRES_PASSWORD}
+      quarkus.http.port: 19120
+      quarkus.http.host: 0.0.0.0
+      quarkus.log.level: INFO
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - lakehouse
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:19120/api/v2/config"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # Conteneur pour initialiser le volume Spark partagé
+  spark-init:
+    image: apache/spark:3.5.3-python3
+    container_name: ${ENV:-dev}-spark-init
+    command: >
+      sh -c "
+      echo 'Copying Spark to shared volume...';
+      rm -rf /spark-dist/*;
+      cp -r /opt/spark/* /spark-dist/;
+      echo 'Spark copied successfully!';
+      "
+    volumes:
+      - spark-dist:/spark-dist
+    networks:
+      - lakehouse
+
+  spark-master:
+    image: apache/spark:3.5.3-python3
+    container_name: ${ENV:-dev}-spark-master
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+    environment:
+      - SPARK_MASTER_HOST=spark-master
+      - SPARK_MASTER_PORT=${SPARK_MASTER_PORT:-7077}
+      - SPARK_MASTER_WEBUI_PORT=8080
+    ports:
+      - "${SPARK_MASTER_PORT:-7077}:7077"
+      - "${SPARK_MASTER_UI_PORT:-8080}:8080"
+    volumes:
+      - ../../config/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
+      - spark-apps:/opt/spark-apps
+    networks:
+      - lakehouse
+    depends_on:
+      - minio
+      - nessie
+      - spark-init
+
+  spark-worker:
+    image: apache/spark:3.5.3-python3
+    container_name: ${ENV:-dev}-spark-worker
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    environment:
+      - SPARK_WORKER_CORES=${SPARK_WORKER_CORES:-2}
+      - SPARK_WORKER_MEMORY=${SPARK_WORKER_MEMORY:-2g}
+    volumes:
+      - ../../config/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
+      - spark-apps:/opt/spark-apps
+    networks:
+      - lakehouse
+    depends_on:
+      - spark-master
+
+  # Zeppelin avec Spark monté (selon doc officielle)
+  zeppelin:
+    image: apache/zeppelin:0.12.0
+    container_name: ${ENV:-dev}-zeppelin
+    ports:
+      - "${ZEPPELIN_PORT:-8081}:8080"
+    environment:
+      ZEPPELIN_ADDR: 0.0.0.0
+      SPARK_HOME: /opt/spark
+      ZEPPELIN_NOTEBOOK_DIR: /notebook
+      ZEPPELIN_LOG_DIR: /logs
+    volumes:
+      - zeppelin-notebooks:/notebook
+      - zeppelin-logs:/logs
+      - spark-dist:/opt/spark:ro
+    depends_on:
+      - spark-master
+      - spark-init
+    networks:
+      - lakehouse
+
+volumes:
+  postgres-data:
+  minio-data:
+  spark-apps:
+  spark-dist:
+  zeppelin-notebooks:
+  zeppelin-logs:
+
+networks:
+  lakehouse:
+    driver: bridge
