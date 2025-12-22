@@ -2,5 +2,6 @@
 CREATE DATABASE nessie;
 CREATE DATABASE airflow;
 CREATE DATABASE dremio;
+CREATE DATABASE superset;
 
 -- Les privilèges sont automatiquement accordés au user principal

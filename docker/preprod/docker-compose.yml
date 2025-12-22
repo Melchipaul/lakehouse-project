@@ -1,13 +1,13 @@
 services:
   postgres:
     image: postgres:17
-    container_name: ${ENV:-dev}-postgres
+    container_name: ${ENV:-preprod}-postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-lakehouse}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-lakehouse}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${POSTGRES_PORT:-6432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ../../config/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -21,10 +21,10 @@ services:
 
   minio:
     image: minio/minio:latest
-    container_name: ${ENV:-dev}-minio
+    container_name: ${ENV:-preprod}-minio
     ports:
-      - "${MINIO_API_PORT:-19000}:9000"
-      - "${MINIO_CONSOLE_PORT:-19001}:9001"
+      - "${MINIO_API_PORT:-20000}:9000"
+      - "${MINIO_CONSOLE_PORT:-20001}:9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
@@ -42,7 +42,7 @@ services:
 
   minio-init:
     image: minio/mc:latest
-    container_name: ${ENV:-dev}-minio-init
+    container_name: ${ENV:-preprod}-minio-init
     depends_on:
       minio:
         condition: service_healthy
@@ -51,8 +51,8 @@ services:
       echo 'Waiting for MinIO to be ready...';
       sleep 10;
       mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER:-admin} ${MINIO_ROOT_PASSWORD};
-      mc mb myminio/${LAKEHOUSE_BUCKET:-lakehouse-dev} --ignore-existing;
-      mc mb myminio/${WAREHOUSE_BUCKET:-warehouse-dev} --ignore-existing;
+      mc mb myminio/${LAKEHOUSE_BUCKET:-lakehouse-preprod} --ignore-existing;
+      mc mb myminio/${WAREHOUSE_BUCKET:-warehouse-preprod} --ignore-existing;
       echo 'Buckets created successfully!';
       exit 0;
       "
@@ -61,9 +61,9 @@ services:
 
   nessie:
     image: ghcr.io/projectnessie/nessie:latest
-    container_name: ${ENV:-dev}-nessie
+    container_name: ${ENV:-preprod}-nessie
     ports:
-      - "${NESSIE_PORT:-19120}:19120"
+      - "${NESSIE_PORT:-20120}:19120"
     environment:
       nessie.version.store.type: JDBC
       quarkus.datasource.jdbc.url: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-lakehouse}
@@ -86,15 +86,15 @@ services:
 
   spark-master:
     image: apache/spark:3.5.4-python3
-    container_name: ${ENV:-dev}-spark-master
+    container_name: ${ENV:-preprod}-spark-master
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
     environment:
       - SPARK_MASTER_HOST=spark-master
-      - SPARK_MASTER_PORT=${SPARK_MASTER_PORT:-7077}
+      - SPARK_MASTER_PORT=7077
       - SPARK_MASTER_WEBUI_PORT=8080
     ports:
-      - "${SPARK_MASTER_PORT:-7077}:7077"
-      - "${SPARK_MASTER_UI_PORT:-8080}:8080"
+      - "${SPARK_MASTER_PORT:-8077}:7077"
+      - "${SPARK_MASTER_UI_PORT:-9080}:8080"
     networks:
       - lakehouse
     depends_on:
@@ -103,11 +103,11 @@ services:
 
   spark-worker:
     image: apache/spark:3.5.4-python3
-    container_name: ${ENV:-dev}-spark-worker
+    container_name: ${ENV:-preprod}-spark-worker
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
     environment:
-      - SPARK_WORKER_CORES=${SPARK_WORKER_CORES:-2}
-      - SPARK_WORKER_MEMORY=${SPARK_WORKER_MEMORY:-2g}
+      - SPARK_WORKER_CORES=${SPARK_WORKER_CORES:-4}
+      - SPARK_WORKER_MEMORY=${SPARK_WORKER_MEMORY:-4g}
     networks:
       - lakehouse
     depends_on:
@@ -118,9 +118,9 @@ services:
       context: ../livy-custom
       dockerfile: Dockerfile
     image: lakehouse-livy:latest
-    container_name: ${ENV:-dev}-livy
+    container_name: ${ENV:-preprod}-livy
     ports:
-      - "${LIVY_PORT:-8998}:8998"
+      - "${LIVY_PORT:-9998}:8998"
     environment:
       SPARK_MASTER: spark://spark-master:7077
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-admin}
@@ -142,15 +142,14 @@ services:
 
   zeppelin:
     image: lakehouse-zeppelin:latest
-    container_name: ${ENV:-dev}-zeppelin
+    container_name: ${ENV:-preprod}-zeppelin
     ports:
-      - "${ZEPPELIN_PORT:-8081}:8080"
+      - "${ZEPPELIN_PORT:-9081}:8080"
     environment:
       ZEPPELIN_ADDR: 0.0.0.0
       ZEPPELIN_NOTEBOOK_DEFAULT_THEME: dark
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-admin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
-      # Configuration Livy
       ZEPPELIN_INTP_LIVY_URL: http://livy:8998
       ZEPPELIN_INTP_LIVY_SPARK_MASTER: spark://spark-master:7077
     volumes:
@@ -171,11 +170,11 @@ services:
   # ==========================================
   dremio:
     image: dremio/dremio-oss:latest
-    container_name: ${ENV:-dev}-dremio
+    container_name: ${ENV:-preprod}-dremio
     ports:
-      - "${DREMIO_UI_PORT:-9047}:9047"       # Web UI
-      - "${DREMIO_CLIENT_PORT:-31010}:31010" # ODBC/JDBC client
-      - "${DREMIO_FLIGHT_PORT:-32010}:32010" # Arrow Flight
+      - "${DREMIO_UI_PORT:-10047}:9047"
+      - "${DREMIO_CLIENT_PORT:-41010}:31010"
+      - "${DREMIO_FLIGHT_PORT:-42010}:32010"
     environment:
       DREMIO_JAVA_SERVER_EXTRA_OPTS: >-
         -Dpaths.dist=file:///opt/dremio/data/dist
@@ -202,7 +201,7 @@ services:
   # ==========================================
   airflow-init:
     image: apache/airflow:2.10.4
-    container_name: ${ENV:-dev}-airflow-init
+    container_name: ${ENV:-preprod}-airflow-init
     entrypoint: /bin/bash
     command:
       - -c
@@ -229,17 +228,17 @@ services:
 
   airflow-webserver:
     image: apache/airflow:2.10.4
-    container_name: ${ENV:-dev}-airflow-webserver
+    container_name: ${ENV:-preprod}-airflow-webserver
     command: webserver
     ports:
-      - "${AIRFLOW_PORT:-8082}:8080"
+      - "${AIRFLOW_PORT:-9082}:8080"
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER:-lakehouse}:${POSTGRES_PASSWORD}@postgres:5432/airflow
       AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
       AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY}
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
-      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'false'
     volumes:
       - airflow-dags:/opt/airflow/dags
       - airflow-logs:/opt/airflow/logs
@@ -257,7 +256,7 @@ services:
 
   airflow-scheduler:
     image: apache/airflow:2.10.4
-    container_name: ${ENV:-dev}-airflow-scheduler
+    container_name: ${ENV:-preprod}-airflow-scheduler
     command: scheduler
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
@@ -279,7 +278,7 @@ services:
   # ==========================================
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter:latest
-    container_name: ${ENV:-dev}-postgres-exporter
+    container_name: ${ENV:-preprod}-postgres-exporter
     environment:
       DATA_SOURCE_NAME: postgresql://${POSTGRES_USER:-lakehouse}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-lakehouse}?sslmode=disable
     networks:
@@ -290,9 +289,9 @@ services:
 
   prometheus:
     image: prom/prometheus:latest
-    container_name: ${ENV:-dev}-prometheus
+    container_name: ${ENV:-preprod}-prometheus
     ports:
-      - "${PROMETHEUS_PORT:-9090}:9090"
+      - "${PROMETHEUS_PORT:-10090}:9090"
     volumes:
       - ../../config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
@@ -313,9 +312,9 @@ services:
   # ==========================================
   grafana:
     image: grafana/grafana:latest
-    container_name: ${ENV:-dev}-grafana
+    container_name: ${ENV:-preprod}-grafana
     ports:
-      - "${GRAFANA_PORT:-3001}:3000"
+      - "${GRAFANA_PORT:-4001}:3000"
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
@@ -341,7 +340,7 @@ services:
       context: ../superset-custom
       dockerfile: Dockerfile
     image: lakehouse-superset:latest
-    container_name: ${ENV:-dev}-superset-init
+    container_name: ${ENV:-preprod}-superset-init
     command:
       - /bin/bash
       - -c
@@ -357,6 +356,8 @@ services:
     environment:
       SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-supersetSecretKey}
       SUPERSET_CONFIG_PATH: /app/pythonpath/superset_config.py
+      POSTGRES_USER: ${POSTGRES_USER:-lakehouse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - ../../config/superset/superset_config.py:/app/pythonpath/superset_config.py:ro
     networks:
@@ -370,12 +371,14 @@ services:
       context: ../superset-custom
       dockerfile: Dockerfile
     image: lakehouse-superset:latest
-    container_name: ${ENV:-dev}-superset
+    container_name: ${ENV:-preprod}-superset
     ports:
-      - "${SUPERSET_PORT:-8088}:8088"
+      - "${SUPERSET_PORT:-9088}:8088"
     environment:
       SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-supersetSecretKey}
       SUPERSET_CONFIG_PATH: /app/pythonpath/superset_config.py
+      POSTGRES_USER: ${POSTGRES_USER:-lakehouse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - ../../config/superset/superset_config.py:/app/pythonpath/superset_config.py:ro
     networks:

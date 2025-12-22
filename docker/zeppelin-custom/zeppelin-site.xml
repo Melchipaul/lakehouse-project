@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<configuration>
+  <!-- Force Dark Theme par défaut -->
+  <property>
+    <name>zeppelin.anonymous.allowed</name>
+    <value>true</value>
+    <description>Allow anonymous access</description>
+  </property>
+  
+  <!-- Forcer le dark mode -->
+  <property>
+    <name>zeppelin.notebook.default.theme</name>
+    <value>dark</value>
+    <description>Default theme (dark or light)</description>
+  </property>
+  
+  <!-- Timeout pour les gros jobs Spark -->
+  <property>
+    <name>zeppelin.interpreter.connect.timeout</name>
+    <value>120000</value>
+    <description>Interpreter connect timeout in milliseconds</description>
+  </property>
+  
+  <!-- Activer les notifications -->
+  <property>
+    <name>zeppelin.notebook.collaborative.mode.enable</name>
+    <value>true</value>
+    <description>Enable collaborative mode</description>
+  </property>
+</configuration>

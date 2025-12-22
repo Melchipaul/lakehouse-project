@@ -1,0 +1,77 @@
+/* Dark Theme CSS Override pour Zeppelin Anonymous Mode */
+
+/* Forcer le dark theme sur le body */
+body {
+  background-color: #1e1e1e !important;
+  color: #d4d4d4 !important;
+}
+
+/* Navbar */
+.navbar {
+  background-color: #2d2d2d !important;
+  border-color: #3e3e3e !important;
+}
+
+/* Sidebar */
+.sidebar {
+  background-color: #252525 !important;
+  color: #d4d4d4 !important;
+}
+
+/* Paragraphes/Cellules */
+.paragraph,
+.paragraph-space {
+  background-color: #1e1e1e !important;
+  border-color: #3e3e3e !important;
+}
+
+/* Code editor */
+.ace_editor {
+  background-color: #1e1e1e !important;
+}
+
+.ace_gutter {
+  background-color: #252525 !important;
+  color: #858585 !important;
+}
+
+/* Tables */
+.table {
+  background-color: #1e1e1e !important;
+  color: #d4d4d4 !important;
+}
+
+.table-striped > tbody > tr:nth-of-type(odd) {
+  background-color: #252525 !important;
+}
+
+/* Modals */
+.modal-content {
+  background-color: #2d2d2d !important;
+  color: #d4d4d4 !important;
+}
+
+/* Inputs */
+input,
+textarea,
+select {
+  background-color: #2d2d2d !important;
+  color: #d4d4d4 !important;
+  border-color: #3e3e3e !important;
+}
+
+/* Buttons */
+.btn-default {
+  background-color: #3e3e3e !important;
+  color: #d4d4d4 !important;
+  border-color: #4e4e4e !important;
+}
+
+/* Links */
+a {
+  color: #569cd6 !important;
+}
+
+a:hover {
+  color: #4ec9b0 !important;
+}

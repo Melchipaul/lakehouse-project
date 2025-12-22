@@ -1,229 +1,507 @@
-# ��� Lakehouse Open-Source
+# 🏗️ Projet Lakehouse - Stack Data Moderne Complète
 
-Lakehouse moderne basé sur Apache Iceberg, Nessie, MinIO et Spark.
+Architecture Data Lakehouse moderne de fin 2025 avec Apache Iceberg, Nessie, Spark, et une suite complète d'outils Data.
 
-## ��� Architecture
+> 🎯 **Stack complète : Ingestion → Traitement → Requêtage → Visualisation → Monitoring**  
+> Configuration Infrastructure as Code 100% reproductible avec credentials externalisés.
+
+## 📊 Architecture
+
 ```
-┌─────────────────────────────────────────────────────┐
-│                   Apache Zeppelin                    │
-│              (Notebooks multi-langage)               │
-└──────────────────┬──────────────────────────────────┘
-                   │
-┌──────────────────▼──────────────────────────────────┐
-│              Apache Spark 3.5.3                      │
-│         (Spark Master + Workers)                     │
-└──────────┬─────────────────────┬────────────────────┘
-           │                     │
-     ┌─────▼─────┐        ┌─────▼─────┐
-     │  Nessie   │        │   MinIO   │
-     │ (Catalog) │        │ (Storage) │
-     └─────┬─────┘        └───────────┘
-           │
-     ┌─────▼─────┐
-     │PostgreSQL │
-     │ (Metadata)│
-     └───────────┘
-```
-
-## ��� Stack Technique
-
-| Composant | Version | Rôle |
-|-----------|---------|------|
-| **Apache Spark** | 3.5.3 | Moteur de calcul distribué |
-| **Apache Iceberg** | 1.6.1 | Format de table lakehouse |
-| **Project Nessie** | 0.106.0 | Catalogue de données versionné (Git pour data) |
-| **MinIO** | latest | Stockage objet S3-compatible |
-| **PostgreSQL** | 17 | Base de données pour métadonnées |
-| **Apache Zeppelin** | 0.12.0 | Notebooks multi-langage (Python, Scala, SQL) |
-
-## ��� Structure du Projet
-```
-lakehouse-project/
-├── docker/
-│   └── dev/
-│       ├── docker-compose.yml    # Orchestration services
-│       └── .env                  # Variables d'environnement
-├── config/
-│   ├── postgres/
-│   │   └── init.sql             # Initialisation bases de données
-│   ├── spark/
-│   │   └── spark-defaults.conf  # Configuration Spark
-│   └── zeppelin/                # Configuration Zeppelin (à venir)
-└── README.md
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           Docker Network: dev_lakehouse                          │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                   │
+│  ┌──────────────┐   ┌──────────────┐   ┌──────────────┐   ┌──────────────┐      │
+│  │  PostgreSQL  │   │    MinIO     │   │    Nessie    │   │  Prometheus  │      │
+│  │      17      │   │   (S3-like)  │   │  (Catalog)   │   │  (Metrics)   │      │
+│  └──────┬───────┘   └──────┬───────┘   └──────┬───────┘   └──────┬───────┘      │
+│         │                  │                  │                  │               │
+│         └──────────────────┴─────────┬────────┴──────────────────┘               │
+│                                      │                                            │
+│  ┌───────────────────────────────────▼─────────────────────────────────────────┐ │
+│  │                   Spark 3.5.4 Cluster (Standalone)                          │ │
+│  │         ┌─────────────┐              ┌─────────────┐                        │ │
+│  │         │   Master    │◄────────────►│   Worker    │                        │ │
+│  │         └─────────────┘              └─────────────┘                        │ │
+│  └───────────────────────────────────▲─────────────────────────────────────────┘ │
+│                                      │                                            │
+│  ┌───────────────────────────────────┴─────────────────────────────────────────┐ │
+│  │                    Apache Livy (Custom Build - REST API)                    │ │
+│  │           Compilé avec profil Spark 3.5 + Iceberg 1.7.0 + Nessie            │ │
+│  └───────────────────────────────────▲─────────────────────────────────────────┘ │
+│                                      │                                            │
+│    ┌─────────────┐     ┌─────────────┴───────────┐     ┌─────────────┐          │
+│    │   Zeppelin  │     │         Airflow         │     │   Dremio    │          │
+│    │  (Notebook) │     │    (Orchestration)      │     │ (SQL Query) │          │
+│    └─────────────┘     └─────────────────────────┘     └──────┬──────┘          │
+│                                                               │                  │
+│    ┌─────────────────────────────────────────────────────────┴───────────────┐  │
+│    │                         Visualization Layer                              │  │
+│    │         ┌─────────────┐                    ┌─────────────┐              │  │
+│    │         │   Grafana   │                    │  Superset   │              │  │
+│    │         │ (Monitoring)│                    │    (BI)     │              │  │
+│    │         └─────────────┘                    └─────────────┘              │  │
+│    └─────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                   │
+└─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## ��� Prérequis
+## 📦 Stack Technologique (Décembre 2025)
 
-- Docker & Docker Compose
-- Git
-- 8 GB RAM minimum
-- Ports disponibles : 5432, 7077, 8080-8081, 19000-19001, 19120
+| Composant | Version | Rôle | Port |
+|-----------|---------|------|------|
+| **Apache Spark** | 3.5.4 | Moteur de traitement distribué | 7077, 8080 |
+| **Apache Livy** | custom | REST API pour Spark | 8998 |
+| **Apache Iceberg** | 1.7.0 | Format de table lakehouse | - |
+| **Nessie** | latest | Catalogue Git-like avec versioning | 19120 |
+| **MinIO** | latest | Stockage objet S3-compatible | 19000, 19001 |
+| **PostgreSQL** | 17 | Backend metadata | 5432 |
+| **Zeppelin** | 0.12.0 | Interface notebook (dark mode) | 8081 |
+| **Dremio OSS** | latest | SQL Query Engine | 9047, 31010, 32010 |
+| **Airflow** | 2.10.4 | Orchestration de workflows | 8082 |
+| **Prometheus** | latest | Collecte de métriques | 9090 |
+| **Grafana** | latest | Dashboards monitoring | 3001 |
+| **Superset** | latest | BI & Data Visualization | 8088 |
 
-## ��� Démarrage Rapide
+### Packages Maven intégrés
 
-### 1. Cloner le projet
+- `iceberg-spark-runtime-3.5_2.12:1.7.0`
+- `nessie-spark-extensions-3.5_2.12:0.106.0`
+- `hadoop-aws:3.3.4`
+- `software.amazon.awssdk:bundle:2.20.18`
+
+## 🚀 Démarrage Rapide
+
+### Prérequis
+
+- Docker 24.0+ avec BuildKit
+- Docker Compose 2.0+
+- **16 GB RAM** minimum (stack complète de 14 services)
+- 30 GB d'espace disque libre
+
+### Installation en 4 étapes
+
+#### 1. Vérifier la structure du projet
+
 ```bash
-git clone https://github.com/VOTRE-USERNAME/lakehouse-project.git
-cd lakehouse-project
+# À la racine du projet
+./scripts/verify-setup.sh
 ```
 
-### 2. Configurer les variables d'environnement
+#### 2. Configurer les credentials
+
 ```bash
 cd docker/dev
 cp .env.example .env
-# Éditer .env si nécessaire
+
+# Éditer .env et remplacer TOUS les CHANGEME_SECURE_PASSWORD
+nano .env  # ou vim, code, etc.
 ```
 
-### 3. Démarrer l'infrastructure
+#### 3. Build des images custom
+
 ```bash
-docker-compose up -d
+# Build Livy (15-25 min - nécessite compilation)
+docker compose build livy
+
+# Build Zeppelin
+docker compose build zeppelin
+
+# Build Superset (avec drivers Dremio)
+docker compose build superset
 ```
 
-### 4. Vérifier le statut
+#### 4. Lancer la stack
+
 ```bash
-docker-compose ps
+# Démarrer tous les services (14 containers)
+docker compose up -d
+
+# Suivre les logs
+docker compose logs -f
+
+# Vérifier l'état
+docker compose ps
 ```
 
-Tous les services doivent être **Up** (sauf minio-init qui doit être **Exited (0)**).
+### ✅ Vérification du déploiement
 
-## ��� Accès aux Interfaces
+```bash
+# Tous les services doivent être "healthy" ou "Up"
+docker compose ps
 
-| Service | URL | Identifiants |
-|---------|-----|--------------|
-| **Zeppelin** | http://localhost:8081 | anonymous (pas de mot de passe) |
+# Tests de connectivité
+curl http://localhost:8998/version         # Livy
+curl http://localhost:19120/api/v2/config  # Nessie
+curl http://localhost:9047                 # Dremio
+curl http://localhost:8082/health          # Airflow
+curl http://localhost:8088/health          # Superset
+curl http://localhost:9090/-/healthy       # Prometheus
+curl http://localhost:3001/api/health      # Grafana
+```
+
+## 🌐 Accès aux Interfaces
+
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| **MinIO Console** | http://localhost:19001 | Voir `.env` (MINIO_ROOT_*) |
 | **Spark Master UI** | http://localhost:8080 | - |
-| **MinIO Console** | http://localhost:19001 | admin / `<voir .env>` |
-| **Nessie API** | http://localhost:19120/api/v2 | - |
-| **PostgreSQL** | localhost:5432 | lakehouse / `<voir .env>` |
+| **Nessie UI** | http://localhost:19120 | - |
+| **Livy REST API** | http://localhost:8998 | - |
+| **Zeppelin** | http://localhost:8081 | - |
+| **Dremio** | http://localhost:9047 | Créé au 1er lancement |
+| **Airflow** | http://localhost:8082 | Voir `.env` (AIRFLOW_*) |
+| **Prometheus** | http://localhost:9090 | - |
+| **Grafana** | http://localhost:3001 | Voir `.env` (GRAFANA_*) |
+| **Superset** | http://localhost:8088 | Voir `.env` (SUPERSET_*) |
 
-## ��� Configuration Zeppelin (Première utilisation)
+## 📚 Documentation complète
 
-### 1. Accéder à Zeppelin
-Ouvrir http://localhost:8081
+- 📖 **[BUILD_AND_DEPLOYMENT.md](docs/BUILD_AND_DEPLOYMENT.md)** → Guide complet de build et troubleshooting
+- 🏗️ **[ARCHITECTURE_DECISIONS.md](docs/ARCHITECTURE_DECISIONS.md)** → Réponses techniques et choix d'architecture
+- 📓 **[zeppelin-configuration.md](docs/zeppelin-configuration.md)** → Configuration Zeppelin → Livy
 
-### 2. Configurer l'interpréteur Spark
-1. Cliquer sur **anonymous** (en haut à droite) → **Interpreter**
-2. Chercher **"spark"** et cliquer sur **"edit"**
-3. Modifier :
-   - `master` : `spark://spark-master:7077`
-   - Ajouter les propriétés suivantes (cliquer sur le bouton **"+"**) :
-```properties
-spark.jars.packages=org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.6.1,org.projectnessie.nessie-integrations:nessie-spark-extensions-3.5_2.12:0.106.0,org.apache.hadoop:hadoop-aws:3.3.4
+## 💡 Exemples d'utilisation
 
-spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions,org.projectnessie.spark.extensions.NessieSparkSessionExtensions
+### Via API Livy (REST)
 
-spark.sql.catalog.nessie=org.apache.iceberg.spark.SparkCatalog
-spark.sql.catalog.nessie.uri=http://nessie:19120/api/v2
-spark.sql.catalog.nessie.ref=main
-spark.sql.catalog.nessie.warehouse=s3a://warehouse-dev/
-spark.sql.catalog.nessie.catalog-impl=org.apache.iceberg.nessie.NessieCatalog
-spark.sql.catalog.nessie.io-impl=org.apache.iceberg.aws.s3.S3FileIO
+```bash
+# Créer une session Spark
+curl -X POST http://localhost:8998/sessions \
+  -H "Content-Type: application/json" \
+  -d '{"kind": "pyspark"}'
 
-spark.hadoop.fs.s3a.endpoint=http://minio:9000
-spark.hadoop.fs.s3a.access.key=admin
-spark.hadoop.fs.s3a.secret.key=<VOIR_VOTRE_.ENV>
-spark.hadoop.fs.s3a.path.style.access=true
-spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem
-spark.hadoop.fs.s3a.connection.ssl.enabled=false
+# Exécuter du code Spark (session 0)
+curl -X POST http://localhost:8998/sessions/0/statements \
+  -H "Content-Type: application/json" \
+  -d '{"code": "spark.range(0, 100).count()"}'
 ```
 
-4. Cliquer sur **"Save"** → **"OK"**
+### Via Zeppelin Notebook
 
-## ��� Test de Base
-
-Créer un notebook Zeppelin et exécuter :
 ```python
 %pyspark
 
-# Tester la connexion Spark
-print(f"✅ Spark version: {spark.version}")
-print(f"✅ Master: {spark.sparkContext.master}")
+# Créer un namespace Iceberg
+spark.sql("CREATE NAMESPACE IF NOT EXISTS nessie.demo")
 
-# Créer une base de données
-spark.sql("CREATE DATABASE IF NOT EXISTS nessie.demo")
-
-# Créer une table Iceberg
+# Créer une table
 spark.sql("""
-CREATE TABLE nessie.demo.test (
-    id INT,
-    name STRING,
-    timestamp TIMESTAMP
-)
-USING iceberg
+    CREATE TABLE nessie.demo.sales (
+        id BIGINT,
+        product STRING,
+        amount DECIMAL(10,2),
+        sale_date DATE
+    ) USING iceberg
+    LOCATION 's3a://warehouse-dev/demo/sales'
 """)
 
 # Insérer des données
 spark.sql("""
-INSERT INTO nessie.demo.test VALUES 
-(1, 'Alice', current_timestamp()),
-(2, 'Bob', current_timestamp())
+    INSERT INTO nessie.demo.sales VALUES
+    (1, 'Laptop', 999.99, CURRENT_DATE),
+    (2, 'Mouse', 29.99, CURRENT_DATE),
+    (3, 'Keyboard', 79.99, CURRENT_DATE)
 """)
 
 # Lire les données
-spark.sql("SELECT * FROM nessie.demo.test").show()
+spark.sql("SELECT * FROM nessie.demo.sales").show()
 ```
 
-## ���️ Commandes Utiles
+### Versionning Git-like avec Nessie
+
+```python
+# Créer une branche de développement
+spark.sql("CREATE BRANCH IF NOT EXISTS dev IN nessie")
+
+# Basculer sur la branche dev
+spark.sql("USE REFERENCE dev IN nessie")
+
+# Faire des modifications (elles sont isolées dans 'dev')
+spark.sql("INSERT INTO nessie.demo.sales VALUES (4, 'Monitor', 299.99, CURRENT_DATE)")
+
+# Revenir sur main pour vérifier l'isolation
+spark.sql("USE REFERENCE main IN nessie")
+spark.sql("SELECT COUNT(*) FROM nessie.demo.sales").show()  # 3 lignes
+
+# Merger dev → main si tests OK
+# (via Nessie API ou CLI)
+```
+
+## 🌍 Multi-Environnements
+
+Le projet supporte 3 environnements avec **isolation totale** (ports différents, volumes séparés) :
+
+| Env | Dossier | Ports | Buckets | Ressources |
+|-----|---------|-------|---------|------------|
+| **DEV** | `docker/dev/` | Base | warehouse-dev | 2 cores, 2g |
+| **PREPROD** | `docker/preprod/` | +1000 | warehouse-preprod | 4 cores, 4g |
+| **PROD** | `docker/prod/` | +2000 | warehouse-prod | 8 cores, 8g |
+
+### Démarrer un environnement
+
 ```bash
-# Voir les logs d'un service
-docker-compose logs -f zeppelin
+# DEV (défaut)
+cd docker/dev && docker compose up -d
 
-# Redémarrer un service
-docker-compose restart zeppelin
+# PREPROD (ports décalés +1000)
+cd docker/preprod && docker compose up -d
 
-# Arrêter l'infrastructure
-docker-compose down
-
-# Arrêter et supprimer les volumes (⚠️ perte de données)
-docker-compose down -v
-
-# Reconstruire les images
-docker-compose up -d --build
+# PROD (ports décalés +2000)
+cd docker/prod && docker compose up -d
 ```
 
-## ��� Problèmes Connus
+### Ports par environnement
 
-### Zeppelin : "Interpreter pyspark not found"
-**Solution** : Configurer l'interpréteur Spark via l'interface (voir section Configuration).
+| Service | DEV | PREPROD | PROD |
+|---------|-----|---------|------|
+| MinIO Console | 19001 | 20001 | 21001 |
+| Spark Master | 8080 | 9080 | 10080 |
+| Nessie | 19120 | 20120 | 21120 |
+| Livy | 8998 | 9998 | 10998 |
+| Zeppelin | 8081 | 9081 | 10081 |
+| Dremio | 9047 | 10047 | 11047 |
+| Airflow | 8082 | 9082 | 10082 |
+| Prometheus | 9090 | 10090 | 11090 |
+| Grafana | 3001 | 4001 | 5001 |
+| Superset | 8088 | 9088 | 10088 |
 
-### Permission Denied sur Windows
-**Solution** : Ce projet fonctionne mieux sur Linux/macOS. Sur Windows, utiliser WSL2.
+### Différences PROD
 
-### Spark Worker ne se connecte pas au Master
-**Solution** : Vérifier que les services sont dans le même réseau Docker :
+- ✅ `restart: unless-stopped` sur tous les services
+- ✅ Rétention Prometheus : 30 jours
+- ✅ Accès anonyme Grafana désactivé
+- ✅ Config Airflow non exposée
+- ✅ Plus de ressources Spark (8 cores, 8g)
+
+## 📁 Structure du projet
+
+```
+lakehouse-project/
+├── docker/
+│   ├── dev/                    # 🟢 Développement
+│   │   ├── docker-compose.yml
+│   │   ├── .env
+│   │   └── .env.example
+│   ├── preprod/                # 🟡 Pré-production
+│   │   ├── docker-compose.yml
+│   │   ├── .env
+│   │   └── .env.example
+│   ├── prod/                   # 🔴 Production
+│   │   ├── docker-compose.yml
+│   │   ├── .env
+│   │   └── .env.example
+│   ├── livy-custom/
+│   │   ├── Dockerfile
+│   │   ├── livy.conf
+│   │   ├── spark-defaults.conf.template
+│   │   └── entrypoint.sh
+│   ├── zeppelin-custom/
+│   │   ├── Dockerfile
+│   │   └── interpreter.json
+│   └── superset-custom/
+│       └── Dockerfile
+├── config/
+│   ├── postgres/init.sql       # Init bases de données
+│   ├── prometheus/prometheus.yml
+│   ├── grafana/provisioning/   # Datasources & dashboards
+│   └── superset/superset_config.py
+├── docs/
+│   ├── BUILD_AND_DEPLOYMENT.md
+│   ├── ARCHITECTURE_DECISIONS.md
+│   └── zeppelin-configuration.md
+├── scripts/
+│   ├── verify-setup.sh         # Vérification structure
+│   └── setup-local-env.sh
+├── .gitignore                  # ⚠️ .env est gitignored
+└── README.md
+```
+
+## 🔐 Sécurité et credentials
+
+### ✅ Bonne pratique implémentée
+
+- ✅ Fichier `.env` **gitignored** (jamais committé)
+- ✅ Template `.env.example` documenté
+- ✅ Injection dynamique via entrypoint (Livy)
+- ✅ Variables d'environnement Docker Compose
+
+### ⚠️ Important
+
+**Ce projet est configuré pour le développement local.**
+
+Pour la production:
+- Utiliser des secrets managers (Vault, AWS Secrets Manager, etc.)
+- Activer l'authentification sur tous les services
+- Configurer SSL/TLS
+- Isoler les réseaux (VPC, subnets)
+- Implémenter des politiques de backup
+- Monitoring et alerting (Prometheus, Grafana)
+
+## 🛠️ Commandes utiles
+
+### Rebuild après modifications
+
 ```bash
-docker network ls
-docker network inspect dev_lakehouse
+# Rebuild Livy
+docker compose build --no-cache livy
+docker compose up -d livy
+
+# Rebuild Zeppelin
+docker compose build --no-cache zeppelin
+docker compose up -d zeppelin
 ```
 
-## ��� Ressources
+### Logs et debugging
 
-- [Apache Iceberg](https://iceberg.apache.org/)
-- [Project Nessie](https://projectnessie.org/)
-- [Apache Spark](https://spark.apache.org/)
-- [Apache Zeppelin](https://zeppelin.apache.org/)
-- [MinIO](https://min.io/)
+```bash
+# Logs de tous les services
+docker compose logs -f
 
-## ��� Contribution
+# Logs d'un service spécifique
+docker compose logs -f livy
 
-Les contributions sont les bienvenues ! N'hésitez pas à ouvrir une issue ou une pull request.
+# Vérifier les variables d'environnement
+docker exec dev-livy env | grep -E "SPARK|MINIO|LIVY"
+```
 
-## ��� Licence
+### Nettoyage
+
+```bash
+# Arrêter les services
+docker compose down
+
+# Arrêter + supprimer les volumes (⚠️ perte de données)
+docker compose down -v
+
+# Nettoyer les images inutilisées
+docker image prune -f
+```
+
+## 🐛 Troubleshooting
+
+### Problème: Build Livy échoue
+
+```bash
+# Augmenter RAM Docker (minimum 6 GB)
+# Docker Desktop > Settings > Resources
+
+# Retry avec logs verbeux
+docker build --progress=plain -t lakehouse-livy:latest docker/livy-custom/
+```
+
+### Problème: "All masters are unresponsive"
+
+```bash
+# Vérifier que Spark Master est démarré
+docker compose ps spark-master
+
+# Redémarrer dans l'ordre
+docker compose restart spark-master
+docker compose restart spark-worker
+docker compose restart livy
+```
+
+### Problème: Credentials MinIO non injectés
+
+```bash
+# Vérifier .env
+cat docker/dev/.env | grep MINIO
+
+# Vérifier l'injection
+docker exec dev-livy cat /opt/livy/conf/spark-defaults.conf | grep s3a.access.key
+
+# Relancer si nécessaire
+docker compose down
+docker compose up -d
+```
+
+**Plus de détails** → [BUILD_AND_DEPLOYMENT.md](docs/BUILD_AND_DEPLOYMENT.md)
+
+## 🎯 Fonctionnalités clés
+
+- ✅ **Lakehouse moderne**: Iceberg 1.7.0 + Nessie (Git-like versioning)
+- ✅ **REST API Spark**: Livy custom avec Spark 3.5.4
+- ✅ **SQL Engine**: Dremio OSS pour requêtes interactives
+- ✅ **Orchestration**: Airflow 2.10.4 pour pipelines data
+- ✅ **Monitoring**: Prometheus + Grafana avec dashboards préconfigurés
+- ✅ **BI**: Superset connecté à Dremio (via Flight)
+- ✅ **Notebooks**: Zeppelin avec dark mode
+- ✅ **Credentials sécurisés**: 100% externalisés, jamais committés
+- ✅ **Infrastructure as Code**: Reproductible sur n'importe quelle machine
+- ✅ **Multi-stage build**: Images Docker optimisées
+- ✅ **Healthchecks**: Détection automatique des problèmes
+
+## 📊 Monitoring & Métriques
+
+### Dashboard Grafana
+
+Le projet inclut un dashboard préconfigé avec :
+- État des services (Prometheus, PostgreSQL, MinIO)
+- Métriques PostgreSQL (connexions, requêtes)
+- Métriques MinIO (stockage)
+
+**Accès**: http://localhost:3001 → Dashboard "Lakehouse Overview"
+
+### Prometheus Targets
+
+| Target | Endpoint | Métriques |
+|--------|----------|-----------|
+| Prometheus | localhost:9090 | Self-monitoring |
+| PostgreSQL | postgres-exporter:9187 | Connexions, requêtes |
+| MinIO | minio:9000/minio/v2/metrics/cluster | Stockage, buckets |
+
+## 🔗 Intégrations
+
+### Dremio → Nessie → MinIO
+
+Dremio est configuré pour accéder aux tables Iceberg via Nessie :
+
+```
+Source Nessie dans Dremio:
+- Endpoint: http://nessie:19120/api/v2
+- AWS Root Path: /warehouse-dev
+- S3 Endpoint: minio:9000 (sans http://)
+- Path Style Access: true
+```
+
+### Superset → Dremio
+
+Superset se connecte à Dremio pour visualiser les données :
+
+```
+SQLAlchemy URI:
+dremio+flight://user:password@dremio:32010/dremio?UseEncryption=false
+```
+
+## 🚧 Roadmap
+
+- [ ] CI/CD avec GitHub Actions
+- [ ] Tests d'intégration automatisés
+- [ ] Support Kubernetes (Helm charts)
+- [x] ~~Environnements preprod/prod~~
+- [x] ~~Monitoring avec Prometheus + Grafana~~
+- [ ] Support Spark 4.x quand mature
+
+## 📝 Licence
 
 MIT
 
-## ✨ État du Projet
+## 🤝 Contribution
 
-**Version actuelle** : 0.1.0 (Développement)
+Les contributions sont les bienvenues ! Ouvrez une issue ou créez une pull request.
 
-**Testé sur** :
-- ✅ Fedora (recommandé)
-- ⚠️ Windows (problèmes de permissions Docker)
-- ��� macOS (non testé)
+---
 
-**Prochaines étapes** :
-- [ ] Configuration automatique Zeppelin
-- [ ] Ajout d'Apache Airflow pour l'orchestration
-- [ ] Ajout de Dremio pour le query engine
-- [ ] Scripts d'exemple et tutoriels
-- [ ] Tests end-to-end
+**Stack complète prête à l'emploi !** 🚀
+
+```bash
+cd docker/dev
+cp .env.example .env
+# Éditer .env avec vos credentials
+docker compose build
+docker compose up -d
+```
+
+**14 services** | **Lakehouse moderne** | **100% reproductible**
