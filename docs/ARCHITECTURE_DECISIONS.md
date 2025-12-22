@@ -253,12 +253,108 @@ sed -e "s|__MINIO_ACCESS_KEY__|${MINIO_ACCESS_KEY}|g" \
 | **Spark Worker** | 3.5.4 | - | Exécution des tâches Spark |
 | **Livy** | master (custom) | 8998 | REST API pour Spark |
 | **Zeppelin** | 0.12.0 | 8081 | Notebook interactif |
+| **Dremio OSS** | latest | 9047, 32010 | SQL Query Engine pour Iceberg |
+| **Airflow** | 2.10.4 | 8082 | Orchestration de workflows |
+| **Prometheus** | latest | 9090 | Collecte de métriques |
+| **Grafana** | latest | 3001 | Dashboards monitoring |
+| **Superset** | latest | 8088 | BI & Data Visualization |
 
 ### Packages intégrés (dans Spark/Livy)
 
 - `iceberg-spark-runtime-3.5_2.12:1.7.0` → Tables Iceberg
 - `nessie-spark-extensions-3.5_2.12:0.106.0` → Catalog Nessie
 - `hadoop-aws:3.3.4` → Connecteur S3A pour MinIO
+
+---
+
+## 6. Pourquoi Dremio OSS ?
+
+**Choix : Dremio OSS** (Open Source)
+
+**Alternatives considérées** :
+
+| Outil | Avantages | Inconvénients |
+|-------|-----------|---------------|
+| **Dremio OSS** ✅ | Support natif Nessie, Arrow Flight, UI SQL | Limité (pas de réflexions cloud) |
+| Trino/Presto | Très populaire, connectors | Pas de support natif Nessie |
+| Starburst | Enterprise, support | Payant |
+
+**Pourquoi Dremio** :
+- ✅ Intégration native avec Nessie (source type dédiée)
+- ✅ Arrow Flight pour Superset (performance)
+- ✅ UI SQL intuitive
+- ✅ Gratuit et open source
+
+**Configuration Nessie dans Dremio** :
+```
+- Nessie Endpoint: http://nessie:19120/api/v2
+- AWS Root Path: /warehouse-dev
+- S3 Endpoint: minio:9000 (SANS http://)
+- fs.s3a.path.style.access = true
+```
+
+---
+
+## 7. Pourquoi Apache Airflow 2.10.4 ?
+
+**Choix : Airflow 2.10.4** (dernière stable décembre 2025)
+
+**Alternatives considérées** :
+
+| Outil | Avantages | Inconvénients |
+|-------|-----------|---------------|
+| **Airflow** ✅ | Standard industrie, DAGs Python | Complexe, lourd |
+| Dagster | Moderne, typage | Moins mature |
+| Prefect | Cloud-native | Moins adopté |
+| Luigi | Simple | Obsolète |
+
+**Pourquoi Airflow** :
+- ✅ Standard de facto pour l'orchestration data
+- ✅ DAGs en Python (pas de DSL propriétaire)
+- ✅ Intégration Spark via Livy operators
+- ✅ Grande communauté et documentation
+
+---
+
+## 8. Pourquoi Prometheus + Grafana ?
+
+**Choix : Stack CNCF standard**
+
+**Pourquoi pas d'alternatives** :
+- DataDog/NewRelic → Payants
+- ELK → Trop lourd pour monitoring simple
+- InfluxDB + Chronograf → Moins adopté
+
+**Configuration** :
+- Prometheus scrape postgres-exporter et MinIO
+- Grafana avec datasource provisionnée (uid: prometheus)
+- Dashboard "Lakehouse Overview" préconfigé
+
+---
+
+## 9. Pourquoi Apache Superset ?
+
+**Choix : Superset** (Apache, open source)
+
+**Alternatives considérées** :
+
+| Outil | Avantages | Inconvénients |
+|-------|-----------|---------------|
+| **Superset** ✅ | Open source, moderne, Arrow Flight | Setup complexe |
+| Metabase | Simple, rapide | Moins puissant |
+| Redash | Léger | Moins maintenu |
+| Power BI | Puissant | Payant, Windows |
+
+**Pourquoi Superset** :
+- ✅ Open source Apache
+- ✅ Support Dremio via sqlalchemy-dremio + pyarrow
+- ✅ Dashboards interactifs modernes
+- ✅ SQL Lab pour exploration
+
+**Connexion Dremio** :
+```
+dremio+flight://user:password@dremio:32010/dremio?UseEncryption=false
+```
 
 ---
 
@@ -270,6 +366,7 @@ sed -e "s|__MINIO_ACCESS_KEY__|${MINIO_ACCESS_KEY}|g" \
    - Spark 3.5.4 (dernière stable)
    - Iceberg 1.7.0 (state-of-the-art pour lakehouses)
    - Nessie (versioning Git-like unique)
+   - Dremio (SQL Engine moderne)
 
 2. **Sécurisé**:
    - Credentials externalisés
@@ -278,7 +375,7 @@ sed -e "s|__MINIO_ACCESS_KEY__|${MINIO_ACCESS_KEY}|g" \
 
 3. **Reproductible**:
    - Infrastructure as Code 100%
-   - Build Dockerfile multi-stage
+   - Multi-environnements (dev/preprod/prod)
    - Documenté et testé
 
 4. **Scalable**:
@@ -286,26 +383,29 @@ sed -e "s|__MINIO_ACCESS_KEY__|${MINIO_ACCESS_KEY}|g" \
    - Livy REST API (multi-sessions)
    - MinIO distribué (si besoin)
 
-5. **Maintenable**:
-   - Configuration centralisée (.env)
-   - Logs accessibles (docker compose logs)
+5. **Observable**:
+   - Prometheus + Grafana
+   - Dashboards préconfigés
    - Healthchecks automatiques
+
+6. **Complet**:
+   - Ingestion → Traitement → Requêtage → Visualisation
+   - 14 services intégrés
 
 ### Limitations connues
 
 1. **Build time Livy**: 15-25 min (acceptable en CI/CD)
-2. **Livy peu actif**: Risque de breaking changes futurs (mais branche master stable)
-3. **Dev only**: Configuration non production-ready (désactiver auth, etc.)
+2. **Livy peu actif**: Risque de breaking changes futurs
+3. **RAM requise**: 16 GB pour stack complète
+4. **Dremio OSS**: Pas de réflexions avancées (version payante)
 
 ---
 
 ## 📚 Documentation complémentaire
 
-- [BUILD_AND_DEPLOYMENT.md](../docs/BUILD_AND_DEPLOYMENT.md) → Guide complet de déploiement
-- [zeppelin-configuration.md](../docs/zeppelin-configuration.md) → Configuration Zeppelin → Livy
-- [Apache Livy REST API](https://livy.incubator.apache.org/docs/latest/rest-api.html)
-- [Apache Iceberg Docs](https://iceberg.apache.org/)
-- [Project Nessie Docs](https://projectnessie.org/)
+- [ARCHITECTURE.md](./ARCHITECTURE.md) → Architecture technique détaillée
+- [BUILD_AND_DEPLOYMENT.md](./BUILD_AND_DEPLOYMENT.md) → Guide complet de déploiement
+- [zeppelin-configuration.md](./zeppelin-configuration.md) → Configuration Zeppelin → Livy
 
 ---
 
@@ -320,24 +420,21 @@ sed -e "s|__MINIO_ACCESS_KEY__|${MINIO_ACCESS_KEY}|g" \
    docker compose up -d
    ```
 
-2. **Vérifier la connectivité**:
+2. **Vérifier tous les services**:
    ```bash
-   curl http://localhost:8998/version
+   docker compose ps
    ```
 
-3. **Créer une session Spark**:
-   ```bash
-   curl -X POST http://localhost:8998/sessions \
-     -H "Content-Type: application/json" \
-     -d '{"kind": "pyspark"}'
-   ```
+3. **Configurer Dremio** → Créer source Nessie
 
-4. **Tester Iceberg + Nessie** via Zeppelin notebook
+4. **Connecter Superset à Dremio**
 
-5. **Documenter vos cas d'usage** et itérer sur la config
+5. **Créer des tables Iceberg** via Zeppelin
+
+6. **Créer des DAGs Airflow** pour ETL
 
 ---
 
-**Prêt pour le build ? 🚀**
+**Stack complète prête ! 🚀**
 
-Suivez le guide dans [BUILD_AND_DEPLOYMENT.md](../docs/BUILD_AND_DEPLOYMENT.md) !
+14 services | Multi-environnements | 100% reproductible

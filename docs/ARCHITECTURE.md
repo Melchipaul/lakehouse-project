@@ -2,50 +2,44 @@
 
 ## 🏗️ Vue d'Ensemble
 
-Stack moderne de Data Lakehouse combinant Apache Iceberg, Nessie, Spark, et MinIO pour un data lake transactionnel avec versioning Git-like.
+Stack moderne de Data Lakehouse complète (14 services) combinant Apache Iceberg, Nessie, Spark, Dremio, Airflow, et une suite de monitoring/BI.
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        USER INTERFACES                          │
-├─────────────────────────────────────────────────────────────────┤
-│  Zeppelin Notebooks      │  MinIO Console  │  Spark UI          │
-│  http://localhost:8081   │  :19001         │  :8080             │
-└─────────────────────────────────────────────────────────────────┘
-                                   │
-                                   ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                     COMPUTE & EXECUTION                         │
-├─────────────────────────────────────────────────────────────────┤
-│                        Apache Livy                              │
-│                    REST API for Spark                           │
-│                    http://localhost:8998                        │
-│                                                                 │
-│  ┌─────────────────────────────────────────────────────┐       │
-│  │         Apache Spark 3.5.4 (Standalone)             │       │
-│  │  ┌──────────────┐  ┌──────────────┐                │       │
-│  │  │ Spark Master │  │ Spark Worker │                │       │
-│  │  │   :7077      │  │   :8081      │                │       │
-│  │  └──────────────┘  └──────────────┘                │       │
-│  └─────────────────────────────────────────────────────┘       │
-└─────────────────────────────────────────────────────────────────┘
-                                   │
-                    ┌──────────────┴──────────────┐
-                    ▼                             ▼
-┌───────────────────────────────┐  ┌──────────────────────────────┐
-│      CATALOG & METADATA       │  │    STORAGE LAYER             │
-├───────────────────────────────┤  ├──────────────────────────────┤
-│     Project Nessie 0.106+     │  │    MinIO (S3-compatible)     │
-│   Git-like Data Catalog       │  │                              │
-│   http://localhost:19120      │  │  API:     :19000             │
-│                               │  │  Console: :19001             │
-│  ┌─────────────────────────┐  │  │                              │
-│  │   Apache Iceberg 1.7.0  │  │  │  Buckets:                    │
-│  │   Table Format          │  │  │  - lakehouse-dev/            │
-│  └─────────────────────────┘  │  │  - warehouse-dev/            │
-│                               │  │                              │
-│  Backend: PostgreSQL 17       │  │  Warehouse location:         │
-│            :5432              │  │  s3a://warehouse-dev/        │
-└───────────────────────────────┘  └──────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              USER INTERFACES                                     │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│  Zeppelin    │  Dremio    │  Airflow   │  Superset  │  Grafana   │  MinIO      │
+│  :8081       │  :9047     │  :8082     │  :8088     │  :3001     │  :19001     │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+            ┌───────────────────────────┼───────────────────────────┐
+            ▼                           ▼                           ▼
+┌───────────────────────┐  ┌─────────────────────────┐  ┌───────────────────────┐
+│   ORCHESTRATION       │  │   COMPUTE & EXECUTION   │  │   SQL QUERY ENGINE    │
+├───────────────────────┤  ├─────────────────────────┤  ├───────────────────────┤
+│  Apache Airflow 2.10  │  │     Apache Livy         │  │    Dremio OSS         │
+│  - Webserver          │  │   REST API for Spark    │  │  - Nessie Source      │
+│  - Scheduler          │  │        :8998            │  │  - Arrow Flight       │
+│        :8082          │  │                         │  │    :9047, :32010      │
+└───────────────────────┘  │  ┌───────────────────┐  │  └───────────────────────┘
+                           │  │ Spark 3.5.4       │  │
+                           │  │ Master + Worker   │  │
+                           │  │ :7077, :8080      │  │
+                           │  └───────────────────┘  │
+                           └─────────────────────────┘
+                                        │
+            ┌───────────────────────────┼───────────────────────────┐
+            ▼                           ▼                           ▼
+┌───────────────────────┐  ┌─────────────────────────┐  ┌───────────────────────┐
+│   CATALOG & METADATA  │  │    STORAGE LAYER        │  │     MONITORING        │
+├───────────────────────┤  ├─────────────────────────┤  ├───────────────────────┤
+│  Nessie (Git-like)    │  │  MinIO (S3-compatible)  │  │  Prometheus :9090     │
+│  + Iceberg 1.7.0      │  │  API: :19000            │  │  + Postgres Exporter  │
+│       :19120          │  │  Console: :19001        │  │                       │
+│                       │  │                         │  │  Grafana :3001        │
+│  Backend:             │  │  Buckets:               │  │  - Dashboards         │
+│  PostgreSQL 17 :5432  │  │  - warehouse-{env}/     │  │  - Alerting           │
+└───────────────────────┘  └─────────────────────────┘  └───────────────────────┘
 ```
 
 ---
@@ -117,6 +111,61 @@ Stack moderne de Data Lakehouse combinant Apache Iceberg, Nessie, Spark, et MinI
   - `%livy.pyspark` : Python via Livy
   - `%livy.sql` : SQL via Livy
 - **Configuration** : Automatique via REST API
+
+### **8. Dremio OSS** (SQL Query Engine)
+- **Rôle** : Moteur SQL pour requêtes interactives sur Iceberg
+- **Ports** :
+  - UI : 9047
+  - ODBC/JDBC : 31010
+  - Arrow Flight : 32010
+- **Fonctionnalités** :
+  - Requêtes SQL optimisées sur Iceberg
+  - Connexion native à Nessie catalog
+  - Arrow Flight pour Superset/BI tools
+  - Réflexions (cache/accélération)
+- **Configuration Nessie** :
+  - Endpoint: `http://nessie:19120/api/v2`
+  - S3 Endpoint: `minio:9000` (sans http://)
+  - Path Style Access: `true`
+
+### **9. Apache Airflow 2.10.4** (Orchestration)
+- **Rôle** : Orchestration de workflows data
+- **Port** : 8082
+- **Composants** :
+  - Webserver (UI)
+  - Scheduler (exécution DAGs)
+- **Backend** : PostgreSQL (database `airflow`)
+- **Fonctionnalités** :
+  - DAGs Python pour pipelines ETL
+  - Scheduling et monitoring
+  - Intégration Spark via Livy operators
+
+### **10. Prometheus** (Metrics Collection)
+- **Rôle** : Collecte et stockage de métriques
+- **Port** : 9090
+- **Targets configurés** :
+  - `prometheus:9090` (self-monitoring)
+  - `postgres-exporter:9187` (PostgreSQL metrics)
+  - `minio:9000/minio/v2/metrics/cluster` (MinIO metrics)
+
+### **11. Grafana** (Dashboards)
+- **Rôle** : Visualisation des métriques
+- **Port** : 3001
+- **Provisioning automatique** :
+  - Datasource Prometheus préconfigurée
+  - Dashboard "Lakehouse Overview" inclus
+- **Métriques affichées** :
+  - État des services
+  - Connexions PostgreSQL
+  - Stockage MinIO
+
+### **12. Apache Superset** (BI & Visualization)
+- **Rôle** : Business Intelligence et dashboards data
+- **Port** : 8088
+- **Connexion Dremio** :
+  - Driver: `sqlalchemy-dremio` + `pyarrow`
+  - URI: `dremio+flight://user:pass@dremio:32010/dremio?UseEncryption=false`
+- **Backend** : PostgreSQL (database `superset`)
 
 ---
 
@@ -265,15 +314,35 @@ spark.conf.set("spark.sql.catalog.nessie.ref", "dev")
 
 ## 📊 Métriques & Monitoring
 
+### **Stack Monitoring**
+
+| Composant | Rôle | Port |
+|-----------|------|------|
+| **Prometheus** | Collecte métriques | 9090 |
+| **Grafana** | Dashboards | 3001 |
+| **Postgres Exporter** | Métriques PostgreSQL | 9187 |
+
+### **Dashboard Grafana "Lakehouse Overview"**
+
+Le dashboard inclut :
+- État des services (Prometheus, PostgreSQL, MinIO)
+- Nombre de connexions PostgreSQL actives
+- Métriques stockage MinIO
+- Uptime des services
+
 ### **URLs de Monitoring**
 
 | Service | URL | Métriques |
 |---------|-----|-----------|
+| **Prometheus** | http://localhost:9090 | Targets, alertes, queries |
+| **Grafana** | http://localhost:3001 | Dashboards, alertes |
 | Spark Master UI | http://localhost:8080 | Jobs, stages, executors |
-| Spark Worker UI | http://localhost:8081 | Memory, cores, tasks |
 | MinIO Console | http://localhost:19001 | Buckets, objects, bandwidth |
 | Livy UI | http://localhost:8998/ui | Sessions actives |
 | Nessie API | http://localhost:19120/api/v2 | Branches, commits |
+| **Dremio** | http://localhost:9047 | Jobs, sources, reflections |
+| **Airflow** | http://localhost:8082 | DAGs, runs, logs |
+| **Superset** | http://localhost:8088 | Dashboards, datasets |
 
 ### **Logs Importants**
 
@@ -296,49 +365,54 @@ docker compose logs nessie -f
 
 - Docker 24+
 - Docker Compose 2.20+
-- 8 GB RAM minimum
-- 20 GB espace disque
+- **16 GB RAM minimum** (stack complète 14 services)
+- 30 GB espace disque
+
+### **Multi-Environnements**
+
+| Environnement | Dossier | Ports | Buckets |
+|---------------|---------|-------|---------|
+| **DEV** | `docker/dev/` | Base | warehouse-dev |
+| **PREPROD** | `docker/preprod/` | +1000 | warehouse-preprod |
+| **PROD** | `docker/prod/` | +2000 | warehouse-prod |
 
 ### **Installation**
 
 ```bash
 # 1. Cloner le repo
 git clone https://github.com/Melchipaul/lakehouse-project.git
-cd lakehouse-project/docker/dev
 
-# 2. Créer .env
+# 2. Choisir l'environnement
+cd lakehouse-project/docker/dev      # ou preprod, prod
+
+# 3. Créer .env
 cp .env.example .env
-nano .env  # Remplir MINIO_ROOT_PASSWORD et POSTGRES_PASSWORD
+nano .env  # Remplir TOUS les CHANGEME_*
 
-# 3. Démarrer la stack
+# 4. Build des images custom
+docker compose build livy zeppelin superset
+
+# 5. Démarrer la stack (14 services)
 docker compose up -d
 
-# 4. Vérifier les services
+# 6. Vérifier les services
 docker compose ps
-
-# 5. Initialiser les données
-./../../scripts/init-lakehouse.sh
-
-# 6. Configurer Zeppelin
-./../../scripts/configure-zeppelin-livy.sh
 ```
 
 ### **Vérification Santé**
 
 ```bash
 # All services healthy
-docker compose ps | grep healthy
+docker compose ps | grep -E "healthy|Up"
 
-# Tester Spark
-curl http://localhost:8080
-
-# Tester Livy
-curl http://localhost:8998/version
-
-# Tester Nessie
-curl http://localhost:19120/api/v2/trees
-
-# Tester MinIO
+# Tests de connectivité
+curl http://localhost:8998/version         # Livy
+curl http://localhost:19120/api/v2/config  # Nessie
+curl http://localhost:9047                 # Dremio
+curl http://localhost:8082/health          # Airflow
+curl http://localhost:8088/health          # Superset
+curl http://localhost:9090/-/healthy       # Prometheus
+curl http://localhost:3001/api/health      # Grafana
 curl http://localhost:19000/minio/health/live
 ```
 
@@ -383,6 +457,11 @@ CALL nessie.system.expire_snapshots(
 - [Apache Spark Documentation](https://spark.apache.org/docs/latest/)
 - [Apache Livy Documentation](https://livy.incubator.apache.org/)
 - [MinIO Documentation](https://min.io/docs/)
+- [Dremio Documentation](https://docs.dremio.com/)
+- [Apache Airflow Documentation](https://airflow.apache.org/docs/)
+- [Apache Superset Documentation](https://superset.apache.org/docs/)
+- [Prometheus Documentation](https://prometheus.io/docs/)
+- [Grafana Documentation](https://grafana.com/docs/)
 
 ---
 
@@ -398,6 +477,37 @@ curl http://localhost:19120/api/v2/config
 docker compose exec postgres psql -U lakehouse -d lakehouse -c "\dt"
 ```
 
+### **Problème : Dremio ne voit pas les tables Nessie**
+
+```
+Configuration source Nessie dans Dremio :
+- Nessie Endpoint: http://nessie:19120/api/v2
+- AWS Root Path: /warehouse-dev
+- S3 Endpoint: minio:9000 (SANS http://)
+- fs.s3a.path.style.access = true
+```
+
+### **Problème : Superset 500 Error**
+
+```bash
+# Vérifier les logs
+docker compose logs superset
+
+# Le driver Dremio nécessite l'image custom
+docker compose build superset
+docker compose up -d superset
+```
+
+### **Problème : Grafana "No data"**
+
+```bash
+# Vérifier Prometheus targets
+curl http://localhost:9090/api/v1/targets
+
+# Vérifier la datasource Grafana
+# La datasource doit avoir uid: prometheus
+```
+
 ### **Problème : MinIO inaccessible**
 
 ```bash
@@ -409,13 +519,13 @@ docker compose exec minio mc ls local/
 ### **Problème : Out of Memory Spark**
 
 ```yaml
-# docker-compose.yml
+# docker-compose.yml - Augmenter ressources worker
 spark-worker:
   environment:
-    SPARK_WORKER_MEMORY: 4g  # Augmenter
+    SPARK_WORKER_MEMORY: 4g  # Augmenter selon environnement
 ```
 
 ---
 
 **Dernière mise à jour** : 22 décembre 2025  
-**Version Stack** : Spark 3.5.4 | Iceberg 1.7.0 | Nessie 0.106+
+**Version Stack** : Spark 3.5.4 | Iceberg 1.7.0 | Nessie latest | Dremio OSS | Airflow 2.10.4 | Superset latest

@@ -4,46 +4,53 @@
 
 - Docker 24.0+ avec BuildKit activé
 - Docker Compose 2.0+
-- 8 GB RAM minimum disponibles pour Docker
-- 20 GB d'espace disque libre
+- **16 GB RAM minimum** disponibles pour Docker (stack complète 14 services)
+- 30 GB d'espace disque libre
+
+## 🌍 Multi-Environnements
+
+Le projet supporte 3 environnements avec isolation totale :
+
+| Environnement | Dossier | Ports | Ressources Spark |
+|---------------|---------|-------|------------------|
+| **DEV** | `docker/dev/` | Base (5432, 19000...) | 2 cores, 2g |
+| **PREPROD** | `docker/preprod/` | +1000 (6432, 20000...) | 4 cores, 4g |
+| **PROD** | `docker/prod/` | +2000 (7432, 21000...) | 8 cores, 8g |
 
 ## 🚀 Démarrage rapide
 
 ### 1. Préparation des credentials
 
 ```bash
-# Depuis la racine du projet
-cd docker/dev
+# Choisir l'environnement
+cd docker/dev      # ou preprod, prod
 
 # Copier le template de configuration
 cp .env.example .env
 
-# Éditer .env et remplacer TOUS les CHANGEME_SECURE_PASSWORD
+# Éditer .env et remplacer TOUS les CHANGEME_*
 nano .env  # ou vim, code, etc.
 ```
 
-### 2. Build de l'image Livy (première fois)
+### 2. Build des images custom (première fois)
 
 ⚠️ **Important**: Le build de Livy prend **15-25 minutes** car il compile depuis les sources.
 
 ```bash
-# Option 1: Build séparé (recommandé pour debugging)
-docker build -t lakehouse-livy:latest ../livy-custom/
-
-# Option 2: Build automatique via docker-compose (plus simple)
+# Build Livy (obligatoire)
 docker compose build livy
+
+# Build Zeppelin (optionnel, pour dark mode)
+docker compose build zeppelin
+
+# Build Superset (obligatoire pour connexion Dremio)
+docker compose build superset
 ```
 
-### 3. Build de l'image Zeppelin (si nécessaire)
+### 3. Lancement de la stack complète
 
 ```bash
-docker build -t lakehouse-zeppelin:latest ../zeppelin-custom/
-```
-
-### 4. Lancement de la stack complète
-
-```bash
-# Lancer tous les services en arrière-plan
+# Lancer tous les 14 services en arrière-plan
 docker compose up -d
 
 # Suivre les logs en temps réel
@@ -58,22 +65,27 @@ docker compose logs -f livy
 ### Services et healthchecks
 
 ```bash
-# Vérifier l'état de tous les services
+# Vérifier l'état de tous les services (14 containers)
 docker compose ps
 
-# Vérifier les healthchecks spécifiquement
-docker compose ps | grep "healthy"
+# Vérifier les healthchecks
+docker compose ps | grep -E "healthy|Up"
 ```
 
-### Accès aux interfaces web
+### Accès aux interfaces web (DEV)
 
 | Service | URL | Credentials |
 |---------|-----|-------------|
-| **MinIO Console** | http://localhost:19001 | `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` |
+| **MinIO Console** | http://localhost:19001 | Voir `.env` |
 | **Spark Master UI** | http://localhost:8080 | - |
 | **Nessie API** | http://localhost:19120/api/v2 | - |
 | **Livy REST API** | http://localhost:8998 | - |
 | **Zeppelin Notebook** | http://localhost:8081 | - |
+| **Dremio** | http://localhost:9047 | Créé au 1er lancement |
+| **Airflow** | http://localhost:8082 | Voir `.env` |
+| **Prometheus** | http://localhost:9090 | - |
+| **Grafana** | http://localhost:3001 | Voir `.env` |
+| **Superset** | http://localhost:8088 | Voir `.env` |
 
 ### Tests de connectivité
 
@@ -87,11 +99,23 @@ curl http://localhost:19000/minio/health/live
 # Test Nessie
 curl http://localhost:19120/api/v2/config
 
-# Test Livy (doit retourner la version)
+# Test Livy
 curl http://localhost:8998/version
 
-# Test Spark Master
-curl http://localhost:8080
+# Test Dremio
+curl http://localhost:9047
+
+# Test Airflow
+curl http://localhost:8082/health
+
+# Test Superset
+curl http://localhost:8088/health
+
+# Test Prometheus
+curl http://localhost:9090/-/healthy
+
+# Test Grafana
+curl http://localhost:3001/api/health
 ```
 
 ## 🧪 Test de session Spark via Livy
@@ -342,18 +366,25 @@ docker compose restart postgres nessie
 
 ## 🎯 Next steps
 
-1. **Configurer Zeppelin** → Se connecter à Livy au lieu de Spark direct
-2. **Créer des tables Iceberg** → Via notebook Zeppelin ou API Livy
-3. **Tester les branches Nessie** → Git-like versioning pour les données
-4. **Setup CI/CD** → Automatiser le build et les tests
+1. **Configurer Dremio** → Créer source Nessie avec connexion MinIO
+2. **Connecter Superset à Dremio** → URI: `dremio+flight://user:pass@dremio:32010/dremio?UseEncryption=false`
+3. **Créer des tables Iceberg** → Via notebook Zeppelin ou API Livy
+4. **Tester les branches Nessie** → Git-like versioning pour les données
+5. **Configurer alertes Grafana** → Ajouter rules sur les métriques
+6. **Créer DAGs Airflow** → Pipelines ETL automatisés
 
 ## 📚 Documentation supplémentaire
 
-- [Configuration Zeppelin](../../docs/zeppelin-configuration.md)
+- [Architecture complète](./ARCHITECTURE.md)
+- [Décisions d'architecture](./ARCHITECTURE_DECISIONS.md)
+- [Configuration Zeppelin](./zeppelin-configuration.md)
 - [Apache Livy REST API](https://livy.incubator.apache.org/docs/latest/rest-api.html)
 - [Apache Iceberg Docs](https://iceberg.apache.org/)
 - [Project Nessie Docs](https://projectnessie.org/)
+- [Dremio Docs](https://docs.dremio.com/)
+- [Airflow Docs](https://airflow.apache.org/docs/)
+- [Superset Docs](https://superset.apache.org/docs/)
 
 ---
 
-**Besoin d'aide ?** Vérifier les logs avec `docker compose logs -f` et consulter la section Troubleshooting.
+**Besoin d'aide ?** Vérifier les logs avec `docker compose logs -f` et consulter [ARCHITECTURE.md](./ARCHITECTURE.md#troubleshooting).
