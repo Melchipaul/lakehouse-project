@@ -57,16 +57,21 @@ jobs:
     if: needs.setup.outputs.environment == 'dev'
     runs-on: self-hosted
     environment: dev
+    defaults:
+      run:
+        working-directory: /home/melchi/Documents/Projet Lakehouse/lakehouse-project
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Pull latest code
+        run: |
+          git fetch origin dev
+          git checkout dev
+          git pull origin dev
 
       - name: Deploy DEV stack
         run: |
           echo "🚀 Deploying DEV environment..."
           docker compose --env-file envs/.env.dev down --remove-orphans || true
-          docker compose --env-file envs/.env.dev pull
-          docker compose --env-file envs/.env.dev up -d --build
+          docker compose --env-file envs/.env.dev up -d
           echo "✅ DEV deployment complete!"
 
       - name: Health check
@@ -94,16 +99,21 @@ jobs:
     if: needs.setup.outputs.environment == 'preprod'
     runs-on: self-hosted
     environment: preprod
+    defaults:
+      run:
+        working-directory: /home/melchi/Documents/Projet Lakehouse/lakehouse-project
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Pull latest code
+        run: |
+          git fetch origin preprod
+          git checkout preprod
+          git pull origin preprod
 
       - name: Deploy PREPROD stack
         run: |
           echo "🚀 Deploying PREPROD environment..."
           docker compose --env-file envs/.env.preprod down --remove-orphans || true
-          docker compose --env-file envs/.env.preprod pull
-          docker compose --env-file envs/.env.preprod up -d --build
+          docker compose --env-file envs/.env.preprod up -d
           echo "✅ PREPROD deployment complete!"
 
       - name: Health check
@@ -139,9 +149,15 @@ jobs:
     environment: 
       name: prod
       # Nécessite approbation manuelle dans GitHub
+    defaults:
+      run:
+        working-directory: /home/melchi/Documents/Projet Lakehouse/lakehouse-project
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Pull latest code
+        run: |
+          git fetch origin prod
+          git checkout prod
+          git pull origin prod
 
       - name: Pre-deployment backup
         run: |
@@ -158,8 +174,7 @@ jobs:
         run: |
           echo "🚀 Deploying PROD environment..."
           docker compose --env-file envs/.env.prod down --remove-orphans || true
-          docker compose --env-file envs/.env.prod pull
-          docker compose --env-file envs/.env.prod up -d --build
+          docker compose --env-file envs/.env.prod up -d
           echo "✅ PROD deployment complete!"
 
       - name: Health check
