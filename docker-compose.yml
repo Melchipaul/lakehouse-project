@@ -187,7 +187,8 @@ services:
       ZEPPELIN_INTP_LIVY_URL: http://livy:8998
       ZEPPELIN_INTP_LIVY_SPARK_MASTER: spark://spark-master:7077
     volumes:
-      - ${ENV}-zeppelin-notebooks:/zeppelin/notebook
+      # Notebooks versionnés dans Git - partagés entre tous les environnements
+      - ./notebooks:/zeppelin/notebook
     networks:
       - ${ENV}-lakehouse
     depends_on:
@@ -441,7 +442,6 @@ services:
 volumes:
   dev-postgres-data:
   dev-minio-data:
-  dev-zeppelin-notebooks:
   dev-dremio-data:
   dev-airflow-dags:
   dev-airflow-logs:
@@ -449,7 +449,6 @@ volumes:
   dev-grafana-data:
   preprod-postgres-data:
   preprod-minio-data:
-  preprod-zeppelin-notebooks:
   preprod-dremio-data:
   preprod-airflow-dags:
   preprod-airflow-logs:
@@ -457,7 +456,6 @@ volumes:
   preprod-grafana-data:
   prod-postgres-data:
   prod-minio-data:
-  prod-zeppelin-notebooks:
   prod-dremio-data:
   prod-airflow-dags:
   prod-airflow-logs:
