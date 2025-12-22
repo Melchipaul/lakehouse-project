@@ -1,0 +1,476 @@
+# ============================================================================
+# LAKEHOUSE STACK - Docker Compose Unifié Multi-Environnement
+# ============================================================================
+# Usage:
+#   DEV:     docker compose --env-file envs/.env.dev up -d
+#   PREPROD: docker compose --env-file envs/.env.preprod up -d
+#   PROD:    docker compose --env-file envs/.env.prod up -d
+# ============================================================================
+
+services:
+  # ==========================================
+  # POSTGRESQL - Base de données principale
+  # ==========================================
+  postgres:
+    image: postgres:17
+    container_name: ${ENV}-postgres
+    restart: ${RESTART_POLICY:-no}
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-lakehouse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-lakehouse}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - ${ENV}-postgres-data:/var/lib/postgresql/data
+      - ./config/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - ${ENV}-lakehouse
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lakehouse}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # MINIO - Object Storage S3-compatible
+  # ==========================================
+  minio:
+    image: minio/minio:latest
+    container_name: ${ENV}-minio
+    restart: ${RESTART_POLICY:-no}
+    ports:
+      - "${MINIO_API_PORT:-19000}:9000"
+      - "${MINIO_CONSOLE_PORT:-19001}:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_PROMETHEUS_AUTH_TYPE: public
+    command: server /data --console-address ":9001"
+    volumes:
+      - ${ENV}-minio-data:/data
+    networks:
+      - ${ENV}-lakehouse
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: ${ENV}-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      echo 'Waiting for MinIO to be ready...';
+      sleep 10;
+      mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER:-admin} ${MINIO_ROOT_PASSWORD};
+      mc mb myminio/${LAKEHOUSE_BUCKET:-lakehouse} --ignore-existing;
+      mc mb myminio/${WAREHOUSE_BUCKET:-warehouse} --ignore-existing;
+      echo 'Buckets created successfully!';
+      exit 0;
+      "
+    networks:
+      - ${ENV}-lakehouse
+
+  # ==========================================
+  # NESSIE - Data Catalog (Iceberg)
+  # ==========================================
+  nessie:
+    image: ghcr.io/projectnessie/nessie:latest
+    container_name: ${ENV}-nessie
+    restart: ${RESTART_POLICY:-no}
+    ports:
+      - "${NESSIE_PORT:-19120}:19120"
+    environment:
+      nessie.version.store.type: JDBC
+      quarkus.datasource.jdbc.url: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-lakehouse}
+      quarkus.datasource.username: ${POSTGRES_USER:-lakehouse}
+      quarkus.datasource.password: ${POSTGRES_PASSWORD}
+      quarkus.http.port: 19120
+      quarkus.http.host: 0.0.0.0
+      quarkus.log.level: INFO
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ${ENV}-lakehouse
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:19120/api/v2/config"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ==========================================
+  # SPARK - Distributed Processing
+  # ==========================================
+  spark-master:
+    image: apache/spark:3.5.4-python3
+    container_name: ${ENV}-spark-master
+    restart: ${RESTART_POLICY:-no}
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+    environment:
+      - SPARK_MASTER_HOST=spark-master
+      - SPARK_MASTER_PORT=7077
+      - SPARK_MASTER_WEBUI_PORT=8080
+    ports:
+      - "${SPARK_MASTER_PORT:-7077}:7077"
+      - "${SPARK_MASTER_UI_PORT:-8080}:8080"
+    networks:
+      - ${ENV}-lakehouse
+    depends_on:
+      - minio
+      - nessie
+
+  spark-worker:
+    image: apache/spark:3.5.4-python3
+    container_name: ${ENV}-spark-worker
+    restart: ${RESTART_POLICY:-no}
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    environment:
+      - SPARK_WORKER_CORES=${SPARK_WORKER_CORES:-2}
+      - SPARK_WORKER_MEMORY=${SPARK_WORKER_MEMORY:-2g}
+    networks:
+      - ${ENV}-lakehouse
+    depends_on:
+      - spark-master
+
+  # ==========================================
+  # LIVY - Spark REST Server
+  # ==========================================
+  livy:
+    build:
+      context: ./docker/livy-custom
+      dockerfile: Dockerfile
+    image: lakehouse-livy:latest
+    container_name: ${ENV}-livy
+    restart: ${RESTART_POLICY:-no}
+    ports:
+      - "${LIVY_PORT:-8998}:8998"
+    environment:
+      SPARK_MASTER: spark://spark-master:7077
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-admin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      SPARK_HOME: /opt/spark
+      LIVY_HOME: /opt/livy
+    networks:
+      - ${ENV}-lakehouse
+    depends_on:
+      - spark-master
+      - nessie
+      - minio
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8998/version"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  # ==========================================
+  # ZEPPELIN - Notebooks
+  # ==========================================
+  zeppelin:
+    image: lakehouse-zeppelin:latest
+    container_name: ${ENV}-zeppelin
+    restart: ${RESTART_POLICY:-no}
+    ports:
+      - "${ZEPPELIN_PORT:-8081}:8080"
+    environment:
+      ZEPPELIN_ADDR: 0.0.0.0
+      ZEPPELIN_NOTEBOOK_DEFAULT_THEME: dark
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-admin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      ZEPPELIN_INTP_LIVY_URL: http://livy:8998
+      ZEPPELIN_INTP_LIVY_SPARK_MASTER: spark://spark-master:7077
+    volumes:
+      - ${ENV}-zeppelin-notebooks:/zeppelin/notebook
+    networks:
+      - ${ENV}-lakehouse
+    depends_on:
+      - livy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  # ==========================================
+  # DREMIO - SQL Query Engine
+  # ==========================================
+  dremio:
+    image: dremio/dremio-oss:latest
+    container_name: ${ENV}-dremio
+    restart: ${RESTART_POLICY:-no}
+    ports:
+      - "${DREMIO_UI_PORT:-9047}:9047"
+      - "${DREMIO_CLIENT_PORT:-31010}:31010"
+      - "${DREMIO_FLIGHT_PORT:-32010}:32010"
+    environment:
+      DREMIO_JAVA_SERVER_EXTRA_OPTS: >-
+        -Dpaths.dist=file:///opt/dremio/data/dist
+        -Dservices.coordinator.enabled=true
+        -Dservices.executor.enabled=true
+    volumes:
+      - ${ENV}-dremio-data:/opt/dremio/data
+    networks:
+      - ${ENV}-lakehouse
+    depends_on:
+      nessie:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9047"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+
+  # ==========================================
+  # AIRFLOW - Workflow Orchestration
+  # ==========================================
+  airflow-init:
+    image: apache/airflow:2.10.4
+    container_name: ${ENV}-airflow-init
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db migrate
+        airflow users create \
+          --username ${AIRFLOW_ADMIN_USER:-admin} \
+          --password ${AIRFLOW_ADMIN_PASSWORD:-admin} \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email admin@localhost
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER:-lakehouse}:${POSTGRES_PASSWORD}@postgres:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY}
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    networks:
+      - ${ENV}-lakehouse
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  airflow-webserver:
+    image: apache/airflow:2.10.4
+    container_name: ${ENV}-airflow-webserver
+    restart: ${RESTART_POLICY:-no}
+    command: webserver
+    ports:
+      - "${AIRFLOW_PORT:-8082}:8080"
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER:-lakehouse}:${POSTGRES_PASSWORD}@postgres:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY}
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
+    volumes:
+      - ${ENV}-airflow-dags:/opt/airflow/dags
+      - ${ENV}-airflow-logs:/opt/airflow/logs
+    networks:
+      - ${ENV}-lakehouse
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  airflow-scheduler:
+    image: apache/airflow:2.10.4
+    container_name: ${ENV}-airflow-scheduler
+    restart: ${RESTART_POLICY:-no}
+    command: scheduler
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER:-lakehouse}:${POSTGRES_PASSWORD}@postgres:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY}
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    volumes:
+      - ${ENV}-airflow-dags:/opt/airflow/dags
+      - ${ENV}-airflow-logs:/opt/airflow/logs
+    networks:
+      - ${ENV}-lakehouse
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  # ==========================================
+  # PROMETHEUS - Metrics Collection
+  # ==========================================
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: ${ENV}-postgres-exporter
+    restart: ${RESTART_POLICY:-no}
+    environment:
+      DATA_SOURCE_NAME: postgresql://${POSTGRES_USER:-lakehouse}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-lakehouse}?sslmode=disable
+    networks:
+      - ${ENV}-lakehouse
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: ${ENV}-prometheus
+    restart: ${RESTART_POLICY:-no}
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ${ENV}-prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+      - '--storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-15d}'
+    networks:
+      - ${ENV}-lakehouse
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==========================================
+  # GRAFANA - Dashboards & Visualization
+  # ==========================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: ${ENV}-grafana
+    restart: ${RESTART_POLICY:-no}
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+    volumes:
+      - ${ENV}-grafana-data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - ${ENV}-lakehouse
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==========================================
+  # SUPERSET - BI & Data Visualization
+  # ==========================================
+  superset-init:
+    build:
+      context: ./docker/superset-custom
+      dockerfile: Dockerfile
+    image: lakehouse-superset:latest
+    container_name: ${ENV}-superset-init
+    command:
+      - /bin/bash
+      - -c
+      - |
+        superset db upgrade
+        superset fab create-admin \
+          --username ${SUPERSET_ADMIN_USER:-admin} \
+          --password ${SUPERSET_ADMIN_PASSWORD:-admin} \
+          --firstname Admin \
+          --lastname User \
+          --email admin@localhost
+        superset init
+    environment:
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-supersetSecretKey}
+      SUPERSET_CONFIG_PATH: /app/pythonpath/superset_config.py
+      POSTGRES_USER: ${POSTGRES_USER:-lakehouse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./config/superset/superset_config.py:/app/pythonpath/superset_config.py:ro
+    networks:
+      - ${ENV}-lakehouse
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  superset:
+    build:
+      context: ./docker/superset-custom
+      dockerfile: Dockerfile
+    image: lakehouse-superset:latest
+    container_name: ${ENV}-superset
+    restart: ${RESTART_POLICY:-no}
+    ports:
+      - "${SUPERSET_PORT:-8088}:8088"
+    environment:
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-supersetSecretKey}
+      SUPERSET_CONFIG_PATH: /app/pythonpath/superset_config.py
+      POSTGRES_USER: ${POSTGRES_USER:-lakehouse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./config/superset/superset_config.py:/app/pythonpath/superset_config.py:ro
+    networks:
+      - ${ENV}-lakehouse
+    depends_on:
+      superset-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+# ==========================================
+# VOLUMES - Préfixés par environnement
+# ==========================================
+volumes:
+  dev-postgres-data:
+  dev-minio-data:
+  dev-zeppelin-notebooks:
+  dev-dremio-data:
+  dev-airflow-dags:
+  dev-airflow-logs:
+  dev-prometheus-data:
+  dev-grafana-data:
+  preprod-postgres-data:
+  preprod-minio-data:
+  preprod-zeppelin-notebooks:
+  preprod-dremio-data:
+  preprod-airflow-dags:
+  preprod-airflow-logs:
+  preprod-prometheus-data:
+  preprod-grafana-data:
+  prod-postgres-data:
+  prod-minio-data:
+  prod-zeppelin-notebooks:
+  prod-dremio-data:
+  prod-airflow-dags:
+  prod-airflow-logs:
+  prod-prometheus-data:
+  prod-grafana-data:
+
+# ==========================================
+# NETWORKS - Par environnement
+# ==========================================
+networks:
+  dev-lakehouse:
+    driver: bridge
+  preprod-lakehouse:
+    driver: bridge
+  prod-lakehouse:
+    driver: bridge

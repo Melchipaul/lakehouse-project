@@ -4,7 +4,11 @@
 
 # Fichiers sensibles (IMPORTANT!)
 .env
-**/*.env
+# Ignorer tous les .env sauf les exemples
+envs/.env.dev
+envs/.env.preprod
+envs/.env.prod
+!envs/.env.example
 *.pem
 *.key
 *.p12

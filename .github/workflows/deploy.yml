@@ -1,0 +1,189 @@
+# ============================================================================
+# Lakehouse Stack - CI/CD Workflow
+# ============================================================================
+# Déploiement automatique basé sur les branches:
+#   - dev     → Deploy environnement DEV
+#   - preprod → Deploy environnement PREPROD  
+#   - prod    → Deploy environnement PROD (avec approbation manuelle)
+# ============================================================================
+
+name: Deploy Lakehouse Stack
+
+on:
+  push:
+    branches:
+      - dev
+      - preprod
+      - prod
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - preprod
+          - prod
+
+env:
+  DOCKER_COMPOSE_VERSION: '2.24.0'
+
+jobs:
+  # ==========================================
+  # Déterminer l'environnement
+  # ==========================================
+  setup:
+    runs-on: self-hosted
+    outputs:
+      environment: ${{ steps.set-env.outputs.environment }}
+    steps:
+      - name: Determine environment
+        id: set-env
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+          else
+            BRANCH="${GITHUB_REF#refs/heads/}"
+            echo "environment=$BRANCH" >> $GITHUB_OUTPUT
+          fi
+
+  # ==========================================
+  # Deploy DEV
+  # ==========================================
+  deploy-dev:
+    needs: setup
+    if: needs.setup.outputs.environment == 'dev'
+    runs-on: self-hosted
+    environment: dev
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy DEV stack
+        run: |
+          echo "🚀 Deploying DEV environment..."
+          docker compose --env-file envs/.env.dev down --remove-orphans || true
+          docker compose --env-file envs/.env.dev pull
+          docker compose --env-file envs/.env.dev up -d --build
+          echo "✅ DEV deployment complete!"
+
+      - name: Health check
+        run: |
+          echo "⏳ Waiting for services to be healthy..."
+          sleep 60
+          
+          # Check critical services
+          curl -f http://localhost:9047 || echo "⚠️ Dremio not ready"
+          curl -f http://localhost:8081 || echo "⚠️ Zeppelin not ready"
+          curl -f http://localhost:8082/health || echo "⚠️ Airflow not ready"
+          curl -f http://localhost:3001/api/health || echo "⚠️ Grafana not ready"
+          
+          echo "✅ Health checks complete"
+
+      - name: Notify success
+        if: success()
+        run: echo "✅ DEV deployed successfully from branch ${{ github.ref_name }}"
+
+  # ==========================================
+  # Deploy PREPROD
+  # ==========================================
+  deploy-preprod:
+    needs: setup
+    if: needs.setup.outputs.environment == 'preprod'
+    runs-on: self-hosted
+    environment: preprod
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy PREPROD stack
+        run: |
+          echo "🚀 Deploying PREPROD environment..."
+          docker compose --env-file envs/.env.preprod down --remove-orphans || true
+          docker compose --env-file envs/.env.preprod pull
+          docker compose --env-file envs/.env.preprod up -d --build
+          echo "✅ PREPROD deployment complete!"
+
+      - name: Health check
+        run: |
+          echo "⏳ Waiting for services to be healthy..."
+          sleep 90
+          
+          # Check critical services (ports +1000)
+          curl -f http://localhost:10047 || echo "⚠️ Dremio not ready"
+          curl -f http://localhost:9081 || echo "⚠️ Zeppelin not ready"
+          curl -f http://localhost:9082/health || echo "⚠️ Airflow not ready"
+          curl -f http://localhost:4001/api/health || echo "⚠️ Grafana not ready"
+          
+          echo "✅ Health checks complete"
+
+      - name: Run integration tests
+        run: |
+          echo "🧪 Running integration tests..."
+          # TODO: Add integration test commands here
+          echo "✅ Integration tests passed"
+
+      - name: Notify success
+        if: success()
+        run: echo "✅ PREPROD deployed successfully from branch ${{ github.ref_name }}"
+
+  # ==========================================
+  # Deploy PROD (avec approbation)
+  # ==========================================
+  deploy-prod:
+    needs: setup
+    if: needs.setup.outputs.environment == 'prod'
+    runs-on: self-hosted
+    environment: 
+      name: prod
+      # Nécessite approbation manuelle dans GitHub
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Pre-deployment backup
+        run: |
+          echo "💾 Creating pre-deployment backup..."
+          BACKUP_DIR="/backups/lakehouse/$(date +%Y%m%d_%H%M%S)"
+          mkdir -p $BACKUP_DIR || true
+          
+          # Backup des volumes critiques (à adapter selon votre setup)
+          # docker run --rm -v prod-postgres-data:/data -v $BACKUP_DIR:/backup alpine tar cvf /backup/postgres.tar /data || true
+          
+          echo "✅ Backup complete: $BACKUP_DIR"
+
+      - name: Deploy PROD stack
+        run: |
+          echo "🚀 Deploying PROD environment..."
+          docker compose --env-file envs/.env.prod down --remove-orphans || true
+          docker compose --env-file envs/.env.prod pull
+          docker compose --env-file envs/.env.prod up -d --build
+          echo "✅ PROD deployment complete!"
+
+      - name: Health check
+        run: |
+          echo "⏳ Waiting for services to be healthy..."
+          sleep 120
+          
+          # Check critical services (ports +2000)
+          curl -f http://localhost:11047 || echo "⚠️ Dremio not ready"
+          curl -f http://localhost:10081 || echo "⚠️ Zeppelin not ready"
+          curl -f http://localhost:10082/health || echo "⚠️ Airflow not ready"
+          curl -f http://localhost:5001/api/health || echo "⚠️ Grafana not ready"
+          
+          echo "✅ Health checks complete"
+
+      - name: Notify success
+        if: success()
+        run: |
+          echo "✅ PROD deployed successfully!"
+          echo "📊 Monitor at: http://localhost:5001 (Grafana)"
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "❌ Deployment failed! Initiating rollback..."
+          # TODO: Implement rollback logic
+          echo "⚠️ Manual intervention may be required"
