@@ -189,7 +189,7 @@ services:
     volumes:
       # Notebooks versionnés dans Git - isolés par environnement
       # Workflow: créer en dev → merge vers preprod → merge vers prod
-      - ./notebooks/${ENV}:/zeppelin/notebook
+      - ./notebooks/${ENV}:/opt/zeppelin/notebook
     networks:
       - ${ENV}-lakehouse
     depends_on:
