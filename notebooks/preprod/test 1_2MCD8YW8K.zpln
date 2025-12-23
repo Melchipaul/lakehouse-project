@@ -1,0 +1,77 @@
+{
+  "paragraphs": [
+    {
+      "text": "%livy.pyspark\nspark.range(10).show()",
+      "user": "anonymous",
+      "dateUpdated": "2025-12-23 00:56:15.352",
+      "progress": 0,
+      "config": {
+        "colWidth": 12.0,
+        "fontSize": 9.0,
+        "results": {},
+        "enabled": true,
+        "editorSetting": {
+          "language": "python",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        }
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "results": {
+        "code": "SUCCESS",
+        "msg": [
+          {
+            "type": "TEXT",
+            "data": "+---+\n| id|\n+---+\n|  0|\n|  1|\n|  2|\n|  3|\n|  4|\n|  5|\n|  6|\n|  7|\n|  8|\n|  9|\n+---+"
+          },
+          {
+            "type": "HTML",
+            "data": "\u003chr/\u003eSpark Application Id: null\u003cbr/\u003eSpark WebUI: \u003ca href\u003d\"null\"\u003enull\u003c/a\u003e"
+          }
+        ]
+      },
+      "apps": [],
+      "runtimeInfos": {},
+      "progressUpdateIntervalMs": 500,
+      "jobName": "paragraph_1766451364546_875090675",
+      "id": "paragraph_1766451364546_875090675",
+      "dateCreated": "2025-12-23 00:56:04.558",
+      "dateStarted": "2025-12-23 00:56:15.368",
+      "dateFinished": "2025-12-23 00:57:17.009",
+      "status": "FINISHED"
+    },
+    {
+      "text": "%livy.pyspark\n",
+      "user": "anonymous",
+      "dateUpdated": "2025-12-23 00:56:15.366",
+      "progress": 0,
+      "config": {},
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "apps": [],
+      "runtimeInfos": {},
+      "progressUpdateIntervalMs": 500,
+      "jobName": "paragraph_1766451375366_1040810991",
+      "id": "paragraph_1766451375366_1040810991",
+      "dateCreated": "2025-12-23 00:56:15.366",
+      "status": "READY"
+    }
+  ],
+  "name": "test 1",
+  "id": "2MCD8YW8K",
+  "defaultInterpreterGroup": "livy",
+  "version": "0.12.0",
+  "noteParams": {},
+  "noteForms": {},
+  "angularObjects": {},
+  "config": {
+    "isZeppelinNotebookCronEnable": false
+  },
+  "info": {}
+}
