@@ -1,0 +1,121 @@
+{
+  "paragraphs": [
+    {
+      "text": "%livy.pyspark\n# Afficher la version de Spark\nsc.version",
+      "user": "anonymous",
+      "dateUpdated": "2025-12-23 15:15:03.182",
+      "progress": 0,
+      "config": {
+        "colWidth": 12.0,
+        "fontSize": 9.0,
+        "results": {},
+        "enabled": true,
+        "editorSetting": {
+          "language": "python",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        }
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "results": {
+        "code": "SUCCESS",
+        "msg": [
+          {
+            "type": "TEXT",
+            "data": "\u00273.5.4\u0027"
+          },
+          {
+            "type": "HTML",
+            "data": "\u003chr/\u003eSpark Application Id: null\u003cbr/\u003eSpark WebUI: \u003ca href\u003d\"null\"\u003enull\u003c/a\u003e"
+          }
+        ]
+      },
+      "apps": [],
+      "runtimeInfos": {},
+      "progressUpdateIntervalMs": 500,
+      "jobName": "paragraph_1766502863682_1565250498",
+      "id": "paragraph_1766502863682_1565250498",
+      "dateCreated": "2025-12-23 15:14:23.683",
+      "dateStarted": "2025-12-23 15:15:03.208",
+      "dateFinished": "2025-12-23 15:15:26.529",
+      "status": "FINISHED"
+    },
+    {
+      "text": "%livy.pyspark\n# Calcul simple avec PySpark\nrdd \u003d sc.parallelize([1, 2, 3, 4, 5])\nrdd.map(lambda x: x * x).collect()\n",
+      "user": "anonymous",
+      "dateUpdated": "2025-12-23 15:16:31.974",
+      "progress": 0,
+      "config": {
+        "colWidth": 12.0,
+        "fontSize": 9.0,
+        "results": {},
+        "enabled": true,
+        "editorSetting": {
+          "language": "python",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        }
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "results": {
+        "code": "SUCCESS",
+        "msg": [
+          {
+            "type": "TEXT",
+            "data": "[1, 4, 9, 16, 25]"
+          },
+          {
+            "type": "HTML",
+            "data": "\u003chr/\u003eSpark Application Id: null\u003cbr/\u003eSpark WebUI: \u003ca href\u003d\"null\"\u003enull\u003c/a\u003e"
+          }
+        ]
+      },
+      "apps": [],
+      "runtimeInfos": {},
+      "progressUpdateIntervalMs": 500,
+      "jobName": "paragraph_1766502903203_705144299",
+      "id": "paragraph_1766502903203_705144299",
+      "dateCreated": "2025-12-23 15:15:03.203",
+      "dateStarted": "2025-12-23 15:16:31.983",
+      "dateFinished": "2025-12-23 15:16:34.068",
+      "status": "FINISHED"
+    },
+    {
+      "text": "%livy.pyspark\n",
+      "user": "anonymous",
+      "dateUpdated": "2025-12-23 15:16:31.983",
+      "progress": 0,
+      "config": {},
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "apps": [],
+      "runtimeInfos": {},
+      "progressUpdateIntervalMs": 500,
+      "jobName": "paragraph_1766502991983_461798388",
+      "id": "paragraph_1766502991983_461798388",
+      "dateCreated": "2025-12-23 15:16:31.983",
+      "status": "READY"
+    }
+  ],
+  "name": "Test Lakehouse",
+  "id": "2MF1VEAE2",
+  "defaultInterpreterGroup": "livy",
+  "version": "0.12.0",
+  "noteParams": {},
+  "noteForms": {},
+  "angularObjects": {},
+  "config": {
+    "isZeppelinNotebookCronEnable": false
+  },
+  "info": {}
+}
