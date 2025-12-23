@@ -1,0 +1,39 @@
+{
+  "name": "Test PySpark Livy",
+  "id": "test_pyspark_livy",
+  "paragraphs": [
+    {
+      "title": "Introduction",
+      "text": "# Test PySpark Livy\nCe notebook vérifie la connexion et l'exécution PySpark via Livy dans Zeppelin.",
+      "config": {
+        "colWidth": 12.0,
+        "fontSize": 9.0,
+        "editorSetting": { "language": "markdown" }
+      },
+      "settings": { "params": {} },
+      "type": "MARKDOWN"
+    },
+    {
+      "title": "Version Spark",
+      "text": "%livy.pyspark\n# Afficher la version de Spark\nsc.version",
+      "config": {
+        "colWidth": 12.0,
+        "fontSize": 9.0,
+        "editorSetting": { "language": "python" }
+      },
+      "settings": { "params": {} },
+      "type": "CODE"
+    },
+    {
+      "title": "Calcul simple",
+      "text": "%livy.pyspark\n# Calcul simple avec PySpark\nrdd = sc.parallelize([1, 2, 3, 4, 5])\nrdd.map(lambda x: x * x).collect()",
+      "config": {
+        "colWidth": 12.0,
+        "fontSize": 9.0,
+        "editorSetting": { "language": "python" }
+      },
+      "settings": { "params": {} },
+      "type": "CODE"
+    }
+  ]
+}
