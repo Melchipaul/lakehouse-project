@@ -1,3 +1,0 @@
-# Ce dossier contient les notebooks Zeppelin versionnés
-# Les notebooks sont au format JSON (.zpln)
-# Ils sont partagés entre tous les environnements (dev, preprod, prod)

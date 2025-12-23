@@ -187,8 +187,9 @@ services:
       ZEPPELIN_INTP_LIVY_URL: http://livy:8998
       ZEPPELIN_INTP_LIVY_SPARK_MASTER: spark://spark-master:7077
     volumes:
-      # Notebooks versionnés dans Git - partagés entre tous les environnements
-      - ./notebooks:/zeppelin/notebook
+      # Notebooks versionnés dans Git - isolés par environnement
+      # Workflow: créer en dev → merge vers preprod → merge vers prod
+      - ./notebooks/${ENV}:/zeppelin/notebook
     networks:
       - ${ENV}-lakehouse
     depends_on:
