@@ -184,12 +184,12 @@ services:
       ZEPPELIN_NOTEBOOK_DEFAULT_THEME: dark
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-admin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
-      ZEPPELIN_INTP_LIVY_URL: http://livy:8998
+      ZEPPELIN_INTP_LIVY_URL: http://${ENV}-livy:8998
       ZEPPELIN_INTP_LIVY_SPARK_MASTER: spark://spark-master:7077
     volumes:
       # Notebooks versionnés dans Git - isolés par environnement
       # Workflow: créer en dev → merge vers preprod → merge vers prod
-      - ./notebooks/${ENV}:/zeppelin/notebook
+      - ./notebooks/${ENV}:/opt/zeppelin/notebook
     networks:
       - ${ENV}-lakehouse
     depends_on:
