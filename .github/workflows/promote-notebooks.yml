@@ -1,0 +1,42 @@
+name: Promote Zeppelin Notebooks
+
+on:
+  push:
+    branches:
+      - dev
+      - preprod
+      - prod
+
+jobs:
+  promote-notebooks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Git user
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Promote notebooks from dev to preprod
+        if: github.ref == 'refs/heads/preprod'
+        run: |
+          rsync -av --delete notebooks/dev/ notebooks/preprod/
+          git add notebooks/preprod/
+          git diff --cached --quiet || git commit -m "Promote notebooks from dev to preprod [auto]"
+          git push
+
+      - name: Promote notebooks from preprod to prod
+        if: github.ref == 'refs/heads/prod'
+        run: |
+          rsync -av --delete notebooks/preprod/ notebooks/prod/
+          git add notebooks/prod/
+          git diff --cached --quiet || git commit -m "Promote notebooks from preprod to prod [auto]"
+          git push
+
+      - name: Promote notebooks from dev to preprod (on dev)
+        if: github.ref == 'refs/heads/dev'
+        run: |
+          # Optionnel : synchroniser dev vers preprod automatiquement sur dev (peu courant)
+          echo "No promotion on dev branch by default."

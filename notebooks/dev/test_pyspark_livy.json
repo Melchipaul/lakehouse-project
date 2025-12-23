@@ -1,0 +1,31 @@
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": { "language": "markdown" },
+      "source": [
+        "# Test PySpark Livy",
+        "Ce notebook vérifie la connexion et l'exécution PySpark via Livy dans Zeppelin."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": { "language": "python" },
+      "source": [
+        "%livy.pyspark",
+        "# Afficher la version de Spark",
+        "sc.version"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": { "language": "python" },
+      "source": [
+        "%livy.pyspark",
+        "# Calcul simple avec PySpark",
+        "rdd = sc.parallelize([1, 2, 3, 4, 5])",
+        "rdd.map(lambda x: x * x).collect()"
+      ]
+    }
+  ]
+}
